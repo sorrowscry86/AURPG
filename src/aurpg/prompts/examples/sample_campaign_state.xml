@@ -1,0 +1,96 @@
+<aurpg_campaign_state version="0.1-prototype">
+  <session_state>
+    <campaign
+      id="camp-neon-ash-01"
+      title="Neon Ash Protocol"
+      genre="cyberpunk_heist"
+      tone="high_tension_character_driven"
+      canon_mode="strict_continuity"
+      orchestration_mode="collaborative_consult"
+    />
+    <play_state
+      mode="solo"
+      scene_id="scene-003-dockyard-infiltration"
+      location="Kestrel Dockyard, Sector 9"
+      objective="Extract witness archive from customs relay"
+      time_marker="02:13 local / pre-dawn rain"
+    />
+    <player_state
+      character_name="Mara Voss"
+      deep_pov="true"
+      stress="4"
+      momentum="6"
+      harm="bruised_ribs"
+      load="normal"
+    />
+    <resolution_state
+      position="risky"
+      effect="standard"
+      move_trigger="face_danger"
+      stakes="silent_breach_before_patrol_turnover"
+    />
+    <safety_state
+      hard_stop="false"
+      pause="false"
+      intensity_check="none"
+    />
+  </session_state>
+
+  <resources>
+    <attributes>
+      <attribute name="edge" value="3" />
+      <attribute name="heart" value="1" />
+      <attribute name="iron" value="2" />
+      <attribute name="shadow" value="2" />
+      <attribute name="wits" value="2" />
+    </attributes>
+    <bonuses>
+      <bonus source="mono-filament_picks" value="1" />
+      <bonus source="intel_from_broker_lattice" value="1" />
+    </bonuses>
+    <relationships>
+      <relationship npc="Lattice" status="uneasy_ally" clock_ref="clk-trust-lattice" />
+      <relationship npc="Captain Rhyl" status="actively_hunting" clock_ref="clk-rhyl-net-tightens" />
+    </relationships>
+    <inventory>
+      <item name="signal_scrambler" tags="tech,stealth,limited_use" />
+      <item name="breach_kit" tags="infiltration,hardware" />
+      <item name="shock_patch" tags="medical,one_use" />
+    </inventory>
+  </resources>
+
+  <state_machines>
+    <clocks>
+      <clock id="clk-mission-archive-extraction" name="Archive Extraction" type="mission" segments="8" filled="5" linked_to="" />
+      <clock id="clk-danger-alarm-sweep" name="Alarm Sweep" type="danger" segments="6" filled="3" linked_to="" />
+      <clock id="clk-race-escape-to-tram" name="Escape to Tramline" type="racing" segments="6" filled="2" linked_to="" />
+      <clock id="clk-race-corp-lockdown" name="Corporate Lockdown" type="racing" segments="6" filled="3" linked_to="" />
+      <clock id="clk-vault-shield-collapse" name="Vault Shield Collapse" type="standard" segments="4" filled="1" linked_to="" />
+      <clock id="clk-security-backdoor-open" name="Security Backdoor Open" type="linked" segments="4" filled="4" linked_to="clk-vault-shield-collapse" />
+      <clock id="clk-trust-lattice" name="Trust: Lattice" type="standard" segments="4" filled="2" linked_to="" />
+      <clock id="clk-rhyl-net-tightens" name="Rhyl's Net Tightens" type="danger" segments="8" filled="4" linked_to="" />
+    </clocks>
+    <progress_tracks>
+      <track id="trk-clear-name" name="Clear Mara's Name" rank="extreme" boxes_filled="2" ticks_in_current_box="1" />
+      <track id="trk-unmask-archive-buyer" name="Unmask Archive Buyer" rank="formidable" boxes_filled="3" ticks_in_current_box="0" />
+    </progress_tracks>
+  </state_machines>
+
+  <safety_profile>
+    <content_category name="horror" status="yellow" guidance="atmosphere_ok_no_gore_focus" />
+    <content_category name="health" status="yellow" guidance="injury_allowed_no_surgery_detail" />
+    <content_category name="relationships" status="green" guidance="character_intimacy_allowed" />
+    <content_category name="social_issues" status="yellow" guidance="systemic_themes_allowed_no_slur_content" />
+  </safety_profile>
+
+  <turn_seed>
+    <player_intent>
+      I press into the relay maintenance tunnel and try to spoof the biometric gate
+      before the patrol rounds the corner.
+    </player_intent>
+    <expected_resolution_path>
+      Solo mode roll with risky/standard consequences; weak hit should advance mission
+      and danger clocks together.
+    </expected_resolution_path>
+  </turn_seed>
+</aurpg_campaign_state>

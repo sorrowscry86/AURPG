@@ -5,6 +5,9 @@
 > AURPG is currently defining its prompt-engine architecture before application
 > code is built. The first implementation-ready prototype lives at
 > [`src/aurpg/prompts/aurpg_system_prompt_prototype.xml`](../src/aurpg/prompts/aurpg_system_prompt_prototype.xml).
+> Usage and evaluation guidance lives at
+> [`docs/PROMPT_USAGE_GUIDE.md`](PROMPT_USAGE_GUIDE.md), with a sample state at
+> [`src/aurpg/prompts/examples/sample_campaign_state.xml`](../src/aurpg/prompts/examples/sample_campaign_state.xml).
 
 ---
 
