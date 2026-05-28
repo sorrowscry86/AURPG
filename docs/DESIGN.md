@@ -1,14 +1,35 @@
 # AURPG Design Document
 
-> **Status: Pending**
+> **Status: Prototype in progress**
 >
-> This document will define the architecture, component boundaries, data schemas,
-> and LLM integration strategy for AURPG.  Implementation will begin once this
-> specification is approved.
+> AURPG is currently defining its prompt-engine architecture before application
+> code is built. The first implementation-ready prototype lives at
+> [`src/aurpg/prompts/aurpg_system_prompt_prototype.xml`](../src/aurpg/prompts/aurpg_system_prompt_prototype.xml).
+> Usage and evaluation guidance lives at
+> [`docs/PROMPT_USAGE_GUIDE.md`](PROMPT_USAGE_GUIDE.md), with a sample state at
+> [`src/aurpg/prompts/examples/sample_campaign_state.xml`](../src/aurpg/prompts/examples/sample_campaign_state.xml).
 
 ---
 
-## Sections (planned)
+## Current prototype scope
+
+The XML prompt prototype establishes the initial contract for:
+
+1. **Unified narrative-mechanical resolution** for solo and squad play
+2. **Verifiable state machines** for clocks, tracks, and progress moves
+3. **Campaign creation orchestration** through a 4-stage onboarding wizard
+4. **Safety and consent infrastructure** with live interrupt commands
+5. **Prompt-quality controls** for agency, prose, pacing, and hidden-reasoning containment
+
+## Near-term design targets
+
+1. **State schema finalisation** — define canonical runtime fields for scenes, actors, clocks, tracks, and safety settings
+2. **Execution loop refinement** — validate fiction-first move triggering and outcome-to-consequence mapping
+3. **Prompt module boundaries** — separate reusable core rules from genre or campaign overlays
+4. **Session lifecycle design** — add save, resume, recap, and summarisation rules
+5. **Validation strategy** — specify prompt tests, golden transcripts, and future parser checks
+
+## Planned follow-on sections
 
 1. **Goals & Non-Goals** — scope of the system
 2. **Architecture Overview** — high-level component diagram
@@ -20,7 +41,3 @@
 8. **Error Handling & Safety** — content moderation, recovery from bad model output
 9. **Testing Strategy** — unit, integration, and golden-path tests
 10. **Roadmap** — phased delivery milestones
-
----
-
-*Fill in each section once the design review is complete.*
