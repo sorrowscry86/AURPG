@@ -77,6 +77,41 @@ Expected checks:
 | Prompt B | Pass | Flashback consumed stress and gave concrete setup benefit. |
 | Prompt C | Pass | Pause command switched to OOC calibration and preserved agency. |
 
+## Sample evaluated outputs (system prompt loaded)
+
+### Prompt A output excerpt
+
+> Rain ticks on the relay casing as your splice seats. **Face Danger (solo),
+> risky/standard: weak hit.**  
+> **State impact:** `clk-mission-archive-extraction 5/8→6/8`;
+> `clk-danger-alarm-sweep 3/6→4/6`; position stays risky.  
+> 1) Slip deeper into the maintenance tunnel before the patrol’s second sweep.  
+> 2) Trigger your signal scrambler now to blunt the alarm cascade.  
+> 3) Ghost a false maintenance ping to misdirect Captain Rhyl’s team.
+
+Result: **Pass** (agency preserved, explicit state updates, exactly 3 options,
+no banned cliché phrases).
+
+### Prompt B output excerpt
+
+> **Flashback accepted.** You paid a dock clerk for a one-shift access key.  
+> **State impact:** stress `4→5`; add
+> `access_key: customs-relay (1 use)`; next bypass gains `risky→controlled`.  
+> 1) Use the key immediately on the biometric gate.  
+> 2) Save the key and probe for a second ingress path.  
+> 3) Use the key to plant a forged audit trail while entering.
+
+Result: **Pass** (flashback cost applied, present-scene benefit clear, exactly
+3 options, no banned cliché phrases).
+
+### Prompt C output excerpt
+
+> **[Pause] acknowledged.** Fiction is frozen and we switch OOC.  
+> Updated safety: health content shifted to PG-13 soft-focus; no graphic body-harm detail.
+
+Result: **Pass** (pause command handled correctly, agency preserved, safety
+constraints updated before resuming play).
+
 ## Known limits in current prototype
 
 - Resolution examples are prompt-level; no external dice service is wired yet.
