@@ -13,18 +13,45 @@ Traditional text RPGs rely on hand-crafted state machines and scripted outcomes.
 
 ## Status
 
-🚧 **Pre-alpha — repository preparation in progress.**
+**Pre-alpha — prompt-engineering phase.**
 
-The system architecture and component design are being documented. Major implementation work will begin once the design document is finalised. See [`docs/DESIGN.md`](docs/DESIGN.md) for the forthcoming specification.
+The XML system prompt prototype is functional and manually evaluated. The canonical state schema and XML validator are in place. The design document is complete. Implementation of a Python session wrapper is the next milestone.
+
+See [`docs/DESIGN.md`](docs/DESIGN.md) for the full specification and roadmap.
+
+## Quick start (developer evaluation)
+
+```bash
+git clone https://github.com/sorrowscry86/AURPG.git
+cd AURPG
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+pip install -e ".[dev]"
+pytest                     # run the test suite
+```
+
+To run the engine:
+
+1. Load `src/aurpg/prompts/aurpg_system_prompt_prototype.xml` as the system instruction in your LLM client.
+2. Load `src/aurpg/prompts/examples/sample_campaign_state.xml` into context.
+3. Send a player action.
+4. See `docs/PROMPT_USAGE_GUIDE.md` for evaluation criteria and canonical test prompts.
 
 ## Repository Layout
 
 ```
 AURPG/
-├── docs/          # Design documents, architecture notes, and specs
-├── src/           # Source code (populated once design is approved)
-│   └── aurpg/
-└── tests/         # Test suite
+├── docs/                        # Design document, prompt usage guide
+├── src/aurpg/
+│   ├── prompts/
+│   │   ├── aurpg_system_prompt_prototype.xml   # The engine — load as system instruction
+│   │   └── examples/
+│   │       └── sample_campaign_state.xml       # Reference runtime state
+│   ├── state.py                 # Canonical Python dataclass state model
+│   └── validator.py             # Campaign state XML validator
+└── tests/
+    ├── test_validator.py        # Validator unit tests
+    └── test_state.py            # State model unit tests (Clock, ProgressTrack)
 ```
 
 ## Contributing
