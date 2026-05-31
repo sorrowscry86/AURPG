@@ -50,7 +50,8 @@ AURPG/
 │   ├── state.py                 # Canonical Python dataclass state model
 │   └── validator.py             # Campaign state XML validator
 └── tests/
-    └── test_validator.py        # Validator unit tests
+    ├── test_validator.py        # Validator unit tests
+    └── test_state.py            # State model unit tests (Clock, ProgressTrack)
 ```
 
 ## Contributing

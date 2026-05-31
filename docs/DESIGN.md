@@ -277,14 +277,14 @@ Problems to detect and handle in future validation tooling:
 
 ### Current
 
-- `tests/test_validator.py` — 7 unit tests covering happy path, parse errors, required fields, enum values, numeric ranges.
+- `tests/test_validator.py` — validator coverage: happy path, file/parse errors, required fields (`deep_pov`, `id`, `name`, etc.), enum values (`harm`, `load`, `play_mode`, `content_status`), numeric ranges, clock and track schema.
+- `tests/test_state.py` — state model unit tests: `Clock.tick` (advance, cap, negative clamp), `ProgressTrack.advance_success` for all five ranks including partial-tick preservation and max-cap edge cases, and `progress_score`.
 - Manual golden-path evaluation — three canonical prompts documented in `docs/PROMPT_USAGE_GUIDE.md`.
 
 ### Planned
 
 | Test tier | Description | Tool |
 |-----------|-------------|------|
-| Unit | State model logic (clock ticking, track advancement, progress move scoring) | pytest |
 | Schema | Validate all bundled XML files pass the validator | pytest |
 | Golden transcript | Load prompt + state, run canonical player action, assert output contract | pytest + LLM API |
 | Regression | Re-run golden transcripts after prompt edits; diff ledger sections | pytest + snapshot |

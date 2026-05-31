@@ -172,20 +172,30 @@ def _check_int_range(
 def _validate_clock(errors: list[str], clock: ET.Element) -> None:
     cid = clock.get("id", "<no-id>")
 
+    for required in ("id", "name", "type", "segments", "filled"):
+        if clock.get(required) is None:
+            errors.append(f"clock id='{cid}' missing required attribute '{required}'")
+
     ctype = clock.get("type", "")
-    if ctype not in VALID_CLOCK_TYPES:
+    if ctype and ctype not in VALID_CLOCK_TYPES:
         errors.append(f"clock id='{cid}' type='{ctype}' must be one of {sorted(VALID_CLOCK_TYPES)}")
 
+    raw_segments = clock.get("segments")
+    if raw_segments is None:
+        return  # already reported above
     try:
-        segments = int(clock.get("segments", "0"))
+        segments = int(raw_segments)
     except ValueError:
         errors.append(f"clock id='{cid}' segments must be an integer")
         return
     if segments not in VALID_CLOCK_SEGMENTS:
         errors.append(f"clock id='{cid}' segments={segments} must be one of {sorted(VALID_CLOCK_SEGMENTS)}")
 
+    raw_filled = clock.get("filled")
+    if raw_filled is None:
+        return  # already reported above
     try:
-        filled = int(clock.get("filled", "0"))
+        filled = int(raw_filled)
     except ValueError:
         errors.append(f"clock id='{cid}' filled must be an integer")
         return
@@ -196,25 +206,33 @@ def _validate_clock(errors: list[str], clock: ET.Element) -> None:
 def _validate_track(errors: list[str], track: ET.Element) -> None:
     tid = track.get("id", "<no-id>")
 
+    for required in ("id", "name", "rank", "boxes_filled", "ticks_in_current_box"):
+        if track.get(required) is None:
+            errors.append(f"track id='{tid}' missing required attribute '{required}'")
+
     rank = track.get("rank", "")
-    if rank not in VALID_TRACK_RANKS:
+    if rank and rank not in VALID_TRACK_RANKS:
         errors.append(f"track id='{tid}' rank='{rank}' must be one of {sorted(VALID_TRACK_RANKS)}")
 
-    try:
-        boxes = int(track.get("boxes_filled", "0"))
-    except ValueError:
-        errors.append(f"track id='{tid}' boxes_filled must be an integer")
-        return
-    if boxes < 0 or boxes > 10:
-        errors.append(f"track id='{tid}' boxes_filled={boxes} must be in [0, 10]")
+    raw_boxes = track.get("boxes_filled")
+    if raw_boxes is not None:
+        try:
+            boxes = int(raw_boxes)
+        except ValueError:
+            errors.append(f"track id='{tid}' boxes_filled must be an integer")
+            return
+        if boxes < 0 or boxes > 10:
+            errors.append(f"track id='{tid}' boxes_filled={boxes} must be in [0, 10]")
 
-    try:
-        ticks = int(track.get("ticks_in_current_box", "0"))
-    except ValueError:
-        errors.append(f"track id='{tid}' ticks_in_current_box must be an integer")
-        return
-    if ticks < 0 or ticks > 3:
-        errors.append(f"track id='{tid}' ticks_in_current_box={ticks} must be in [0, 3]")
+    raw_ticks = track.get("ticks_in_current_box")
+    if raw_ticks is not None:
+        try:
+            ticks = int(raw_ticks)
+        except ValueError:
+            errors.append(f"track id='{tid}' ticks_in_current_box must be an integer")
+            return
+        if ticks < 0 or ticks > 3:
+            errors.append(f"track id='{tid}' ticks_in_current_box={ticks} must be in [0, 3]")
 
 
 # ---------------------------------------------------------------------------
