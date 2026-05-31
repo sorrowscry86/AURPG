@@ -29,7 +29,7 @@ VALID_CLOCK_SEGMENTS = {4, 6, 8}
 REQUIRED_SESSION_ATTRS: dict[str, list[str]] = {
     "campaign": ["id", "title", "genre", "tone", "canon_mode", "orchestration_mode"],
     "play_state": ["mode", "scene_id", "location", "objective", "time_marker"],
-    "player_state": ["character_name", "stress", "momentum", "harm", "load"],
+    "player_state": ["character_name", "deep_pov", "stress", "momentum", "harm", "load"],
     "resolution_state": ["position", "effect", "move_trigger", "stakes"],
     "safety_state": ["hard_stop", "pause", "intensity_check"],
 }
@@ -48,6 +48,8 @@ def validate(path: Path) -> list[str]:
         tree = ET.parse(path)
     except ET.ParseError as exc:
         return [f"XML parse error: {exc}"]
+    except OSError as exc:
+        return [f"File error: {exc}"]
 
     root = tree.getroot()
 
@@ -100,6 +102,20 @@ def validate(path: Path) -> list[str]:
     if player is not None:
         _check_int_range(errors, player, "stress", 0, 10)
         _check_int_range(errors, player, "momentum", -6, 10)
+
+        valid_harm = {"none", "bruised", "wounded", "incapacitated"}
+        harm = player.get("harm", "")
+        if harm not in valid_harm:
+            errors.append(
+                f"<player_state harm='{harm}'> must be one of {sorted(valid_harm)}"
+            )
+
+        valid_load = {"light", "normal", "heavy"}
+        load = player.get("load", "")
+        if load not in valid_load:
+            errors.append(
+                f"<player_state load='{load}'> must be one of {sorted(valid_load)}"
+            )
 
     # -- state_machines ------------------------------------------------------
     machines = root.find("state_machines")

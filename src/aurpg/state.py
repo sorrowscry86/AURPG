@@ -200,7 +200,7 @@ class Clock:
         return max(0, self.segments - self.filled)
 
     def tick(self, n: int = 1) -> None:
-        self.filled = min(self.segments, self.filled + n)
+        self.filled = max(0, min(self.segments, self.filled + n))
 
 
 # Boxes per success by rank
@@ -238,13 +238,15 @@ class ProgressTrack:
 
     def advance_success(self) -> None:
         """Mark progress for one success, scaled to rank."""
+        ticks_to_add = 0
         if self.rank in _BOXES_PER_SUCCESS:
-            self.boxes_filled = min(TRACK_BOXES, self.boxes_filled + _BOXES_PER_SUCCESS[self.rank])
-            self.ticks_in_current_box = 0
+            ticks_to_add = _BOXES_PER_SUCCESS[self.rank] * TICKS_PER_BOX
         elif self.rank in _TICKS_PER_SUCCESS:
-            total = self.total_ticks + _TICKS_PER_SUCCESS[self.rank]
-            self.boxes_filled = min(TRACK_BOXES, total // TICKS_PER_BOX)
-            self.ticks_in_current_box = total % TICKS_PER_BOX
+            ticks_to_add = _TICKS_PER_SUCCESS[self.rank]
+
+        total = min(TRACK_BOXES * TICKS_PER_BOX, self.total_ticks + ticks_to_add)
+        self.boxes_filled = total // TICKS_PER_BOX
+        self.ticks_in_current_box = total % TICKS_PER_BOX
 
 
 @dataclass
