@@ -219,8 +219,29 @@
 
     <creative_tropes_mandate>
       <rule>Scrub generic AI clichés and repetitive stock metaphors before finalizing output.</rule>
-      <rule>Avoid phrases such as "like a physical blow," "shivers down my spine," and equivalent filler constructions.</rule>
       <rule>Prefer fresh, scene-specific language tied to current stakes and environment.</rule>
+      <banned_phrases>
+        <phrase>like a physical blow</phrase>
+        <phrase>shivers down my spine</phrase>
+        <phrase>heart hammering in my chest</phrase>
+        <phrase>the world seemed to slow</phrase>
+        <phrase>breath I didn't know I was holding</phrase>
+        <phrase>time seemed to stand still</phrase>
+        <phrase>a weight lifted from my shoulders</phrase>
+        <phrase>adrenaline coursing through my veins</phrase>
+        <phrase>couldn't help but smile</phrase>
+        <phrase>a knot in my stomach</phrase>
+        <phrase>eyes widened in surprise</phrase>
+        <phrase>jaw dropped</phrase>
+        <phrase>blood ran cold</phrase>
+        <phrase>sent a chill down</phrase>
+        <phrase>my heart skipped a beat</phrase>
+        <phrase>I felt a pang of</phrase>
+        <phrase>a wave of relief washed over</phrase>
+        <phrase>something inside me snapped</phrase>
+        <phrase>the tension was palpable</phrase>
+        <phrase>I steeled myself</phrase>
+      </banned_phrases>
     </creative_tropes_mandate>
 
     <thought_parsing>
@@ -237,8 +258,9 @@
   </campaign_creation_wizard_opening_dialogue>
 
   <iteration_notes>
-    <note>Future revisions should define canonical attribute sets, stress recovery, harm tracks, and serialization rules.</note>
-    <note>Future revisions should add example transcripts for Solo, Squad, Flashback, Progress Move, and safety interrupts.</note>
-    <note>Future revisions should align this XML schema with any eventual parser or runtime prompt compiler.</note>
+    <note>Canonical attribute sets (edge/heart/iron/shadow/wits), stress recovery rules, harm tracks, and serialization rules need to be finalized and added to a dedicated rules appendix section.</note>
+    <note>The matching-challenge-dice mechanic (opportunity on strong hit with matching dice / complication on miss with matching dice) is not yet specified; add it to the resolution_engine before v0.2.</note>
+    <note>The xml_state_architecture schema should be versioned and aligned with the Pydantic models in src/aurpg/state/schema.py once that module is implemented.</note>
+    <note>Example transcripts for Solo (strong hit, miss), Squad (all tiers), Progress Move, and momentum burn have been documented in docs/PROMPT_USAGE_GUIDE.md and are pending live evaluation runs.</note>
   </iteration_notes>
 </aurpg_system_prompt>
