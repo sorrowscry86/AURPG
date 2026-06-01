@@ -61,7 +61,8 @@ The engine must pass all golden transcript regression tests before any external 
   - Aftercare debrief — Stars & Wishes exchange
 
 **State schema canonicalization**
-- [ ] Document every field in `<session_state>`, `<resources>`, `<state_machines>`, and `<safety_profile>` with data type, required/optional status, valid range/enum, and validation rule
+- [ ] Document every field in all five XML state containers — `<session_state>`, `<resources>`, `<state_machines>`, `<safety_profile>`, and `<turn_seed>` — with data type, required/optional status, valid range/enum, and validation rule
+- [ ] Add `<safety_profile>` and `<turn_seed>` to the `<xml_state_architecture>` section of `aurpg_system_prompt_prototype.xml` so the LLM knows their schema (both containers exist in `sample_campaign_state.xml` but are absent from the spec)
 - [ ] Define session lifecycle rules: save format, resume context injection, recap summarization trigger (context length threshold)
 
 **Prompt quality audit**
@@ -108,7 +109,9 @@ The engine must pass all golden transcript regression tests before any external 
 - [ ] Use an LLM judge (secondary Anthropic call) for soft evaluation where exact string match is inappropriate
 
 **CI**
-- [ ] GitHub Actions workflow: run all evaluation tests on every push to `main` and on every PR
+- [ ] GitHub Actions workflow with two tiers:
+  - **PR checks** — run evaluation tests with mocked/cassette responses (e.g., `vcrpy`) so no API key is required; skip live LLM tests via `pytest.mark.skipif` when `ANTHROPIC_API_KEY` is absent (protects fork PRs where secrets are unavailable)
+  - **Post-merge / scheduled** — run the full live LLM evaluation suite against the real Anthropic API on merges to `main` and on a nightly schedule to catch model-drift regressions
 
 ### Exit Criteria
 
@@ -277,7 +280,7 @@ The engine must pass all golden transcript regression tests before any external 
 - [ ] Re-run all 10 golden transcripts after any prompt change
 
 **Completion**
-- [ ] All 5 testers complete at least 3 sessions each (target: ~45 min per session)
+- [ ] All recruited testers (3–5) complete at least 3 sessions each (target: ~45 min per session)
 - [ ] Feedback digest published in `docs/ALPHA_FEEDBACK.md`
 - [ ] Decision gate: proceed to open beta, or return to Phase 4 for another iteration cycle
 

@@ -64,6 +64,15 @@
       </progress_tracks>
     </state_machines>
 
+    <safety_profile>
+      <content_category name="{category}" status="{green|yellow|red}" guidance="{free_text_guidance}" />
+    </safety_profile>
+
+    <turn_seed>
+      <player_intent>{free_text_description_of_intended_action}</player_intent>
+      <expected_resolution_path>{optional_resolution_notes_for_evaluation_use}</expected_resolution_path>
+    </turn_seed>
+
     <output_contract>
       <ledger>Render the current state ledger before or alongside resolution-heavy turns when clarity is needed.</ledger>
       <narration>Deliver deep-POV prose grounded in immediate sensory, emotional, and tactical detail.</narration>
