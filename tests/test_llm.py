@@ -7,10 +7,6 @@ no network credentials are required.
 
 from __future__ import annotations
 
-import time
-import types
-from dataclasses import dataclass
-from typing import Any
 from unittest.mock import MagicMock, patch
 
 import httpx
@@ -71,28 +67,22 @@ def test_assemble_prompt_returns_list():
     assert isinstance(result, list)
 
 
-def test_assemble_prompt_has_two_messages():
-    """Expect a user message (state injection) + the player turn."""
+def test_assemble_prompt_has_one_message():
+    """State and player input must be merged into a single user message (API requires alternating roles)."""
     result = assemble_prompt(SYSTEM_XML, CAMPAIGN_XML, PLAYER_INPUT)
-    assert len(result) == 2
+    assert len(result) == 1
 
 
-def test_assemble_prompt_messages_have_role_and_content():
+def test_assemble_prompt_message_has_role_and_content():
     result = assemble_prompt(SYSTEM_XML, CAMPAIGN_XML, PLAYER_INPUT)
-    for msg in result:
-        assert "role" in msg
-        assert "content" in msg
+    msg = result[0]
+    assert "role" in msg
+    assert "content" in msg
 
 
-def test_assemble_prompt_first_message_role_user():
+def test_assemble_prompt_message_role_user():
     result = assemble_prompt(SYSTEM_XML, CAMPAIGN_XML, PLAYER_INPUT)
     assert result[0]["role"] == "user"
-
-
-def test_assemble_prompt_second_message_role_user():
-    """Both messages are from 'user' role (state injection + player turn)."""
-    result = assemble_prompt(SYSTEM_XML, CAMPAIGN_XML, PLAYER_INPUT)
-    assert result[1]["role"] == "user"
 
 
 def test_assemble_prompt_campaign_state_wrapped_in_tags():
@@ -396,6 +386,24 @@ def test_retry_non_status_error_not_retried():
         with pytest.raises(ValueError):
             call_engine_with_retry(messages, SYSTEM_XML, client=client, model="m", max_retries=3)
     assert client.messages.create.call_count == 1
+
+
+def test_retry_raises_value_error_when_max_retries_less_than_one():
+    """max_retries=0 (or negative) must raise ValueError immediately, before any API call."""
+    client = _make_mock_client(SIMPLE_RESPONSE)
+    messages = assemble_prompt(SYSTEM_XML, CAMPAIGN_XML, PLAYER_INPUT)
+    with pytest.raises(ValueError, match="max_retries must be >= 1"):
+        call_engine_with_retry(messages, SYSTEM_XML, client=client, model="m", max_retries=0)
+    assert client.messages.create.call_count == 0
+
+
+def test_retry_raises_value_error_when_max_retries_negative():
+    """Negative max_retries must also raise ValueError."""
+    client = _make_mock_client(SIMPLE_RESPONSE)
+    messages = assemble_prompt(SYSTEM_XML, CAMPAIGN_XML, PLAYER_INPUT)
+    with pytest.raises(ValueError, match="max_retries must be >= 1"):
+        call_engine_with_retry(messages, SYSTEM_XML, client=client, model="m", max_retries=-1)
+    assert client.messages.create.call_count == 0
 
 
 # ---------------------------------------------------------------------------

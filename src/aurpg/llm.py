@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import re
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import anthropic
 
@@ -83,10 +83,9 @@ def assemble_prompt(
     """Build the ``messages`` list for the Anthropic API call.
 
     The campaign state is wrapped in ``<current_campaign_state>`` tags and
-    injected as the first user message; the player's input follows as a
-    second user message.  The system prompt XML is passed as the ``system``
-    parameter of ``client.messages.create`` — it does **not** appear in this
-    list.
+    merged with the player input into a single user message.  The system
+    prompt XML is passed as the ``system`` parameter of
+    ``client.messages.create`` — it does **not** appear in this list.
 
     Args:
         system_prompt_xml:  The engine's system prompt (XML).  Not embedded
@@ -95,18 +94,18 @@ def assemble_prompt(
         player_input:       The player's action / intent for this turn.
 
     Returns:
-        A two-element list of ``{"role": "user", "content": "..."}`` dicts
-        suitable for passing directly to ``client.messages.create(messages=...)``.
+        A one-element list containing a single ``{"role": "user", "content": "..."}``
+        dict suitable for passing directly to ``client.messages.create(messages=...)``.
+        State and player input are merged into one message to satisfy the
+        Anthropic API requirement that consecutive messages must alternate roles.
     """
-    state_message = (
+    content = (
         "<current_campaign_state>\n"
         f"{campaign_state_xml}\n"
-        "</current_campaign_state>"
+        "</current_campaign_state>\n\n"
+        f"{player_input.strip()}"
     )
-    return [
-        {"role": "user", "content": state_message},
-        {"role": "user", "content": player_input},
-    ]
+    return [{"role": "user", "content": content}]
 
 
 # ---------------------------------------------------------------------------
@@ -213,6 +212,9 @@ def call_engine_with_retry(
         anthropic.APIStatusError: After all *max_retries* attempts fail.
         Any other exception:      Immediately, without retrying.
     """
+    if max_retries < 1:
+        raise ValueError("max_retries must be >= 1")
+
     last_error: anthropic.APIStatusError | None = None
 
     for attempt in range(max_retries):
