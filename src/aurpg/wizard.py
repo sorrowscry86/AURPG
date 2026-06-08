@@ -101,9 +101,8 @@ def validate_config(config: WizardConfig) -> list[str]:
         if not isinstance(value, int) or not (1 <= value <= 3):
             errors.append(f"Attribute '{name}' must be an integer in [1, 3]; got {value!r}")
 
-    # Attribute sum check (only if all individual values are in range, to avoid confusing errors)
     attr_sum = sum(attrs.values())
-    if attr_sum > 10:
+    if not errors and attr_sum > 10:
         errors.append(
             f"Attribute sum must be ≤ 10; got {attr_sum} "
             f"(edge={config.edge}, heart={config.heart}, iron={config.iron}, "

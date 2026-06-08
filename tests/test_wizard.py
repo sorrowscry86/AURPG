@@ -337,7 +337,12 @@ class TestRunWizard:
         answers_iter = iter(answers)
 
         def _fn(_prompt: str = "") -> str:
-            return next(answers_iter)
+            try:
+                return next(answers_iter)
+            except StopIteration:
+                raise RuntimeError(
+                    "prompt_fn exhausted — add more answers to the test list"
+                ) from None
 
         return _fn
 
