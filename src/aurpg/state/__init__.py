@@ -62,8 +62,8 @@ class ContentStatus(str, Enum):
 
 class HarmLevel(str, Enum):
     NONE = "none"
-    BRUISED = "bruised"          # –1 to relevant rolls when fiction applies
-    WOUNDED = "wounded"          # –2; requires care or a specific recovery move
+    BRUISED = "bruised"          # -1 to relevant rolls when fiction applies
+    WOUNDED = "wounded"          # -2; requires care or a specific recovery move
     INCAPACITATED = "incapacitated"  # unable to act without help; mission-critical impact
 
 
@@ -101,8 +101,8 @@ class PlayState:
 class PlayerState:
     character_name: str
     deep_pov: bool
-    stress: int        # 0–10; at 10 the character breaks (trauma/consequence)
-    momentum: int      # –6 to +10; positive can cancel challenge dice
+    stress: int        # 0-10; at 10 the character breaks (trauma/consequence)
+    momentum: int      # -6 to +10; positive can cancel challenge dice
     harm: HarmLevel
     load: LoadState
 
@@ -138,7 +138,7 @@ CANONICAL_ATTRIBUTES = ("edge", "heart", "iron", "shadow", "wits")
 @dataclass
 class Attribute:
     name: str   # one of CANONICAL_ATTRIBUTES
-    value: int  # 1–4 (starting range); 0 is not playable without fiction justification
+    value: int  # 1-4 (starting range); 0 is not playable without fiction justification
 
 
 @dataclass
@@ -224,8 +224,8 @@ class ProgressTrack:
     id: str
     name: str
     rank: TrackRank
-    boxes_filled: int          # 0–10
-    ticks_in_current_box: int  # 0–3
+    boxes_filled: int          # 0-10
+    ticks_in_current_box: int  # 0-3
 
     @property
     def total_ticks(self) -> int:
