@@ -629,3 +629,10 @@ class TestSaveLoadPersistence:
         save_session(session_with_turns, tmp_path)
         loaded = load_session(tmp_path, session_with_turns.id, system_prompt_path=SAMPLE_SYSTEM_PROMPT)
         assert loaded.system_prompt is not None
+
+    def test_save_creates_turns_jsonl_even_when_empty(self, tmp_path):
+        session = new_session(SAMPLE_STATE_XML, SAMPLE_SYSTEM_PROMPT, model=TEST_MODEL)
+        save_session(session, tmp_path)
+        turns_file = tmp_path / session.id / "turns.jsonl"
+        assert turns_file.exists()
+        assert turns_file.read_text(encoding="utf-8") == ""

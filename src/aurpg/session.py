@@ -30,6 +30,7 @@ from aurpg.llm import EngineResponse, assemble_prompt, call_engine_with_retry
 from aurpg.safety import SafetyCommand, build_ooc_response, detect_safety_command
 from aurpg.state.manager import (
     CampaignState,
+    StateError,
     append_turn,
     apply_safety,
     load_state,
@@ -304,13 +305,19 @@ def load_session(
 
     state = load_state(session_dir / "state.xml")
 
-    # Restore turn history from turns.jsonl
     turns_path = session_dir / "turns.jsonl"
+    turn_history: list[dict] = []
     if turns_path.exists():
         for line in turns_path.read_text(encoding="utf-8").splitlines():
             line = line.strip()
             if line:
-                state.turn_history.append(json.loads(line))
+                try:
+                    turn_history.append(json.loads(line))
+                except json.JSONDecodeError as exc:
+                    raise StateError(
+                        f"Malformed JSON in {turns_path} (line {line[:60]!r}): {exc}"
+                    ) from exc
+    state.turn_history = turn_history
 
     return Session(
         id=meta["id"],
