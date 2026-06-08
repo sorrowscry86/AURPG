@@ -38,6 +38,9 @@ class CampaignState:
     All container fields hold raw attribute dicts so the manager stays
     decoupled from the typed dataclasses in ``aurpg.state``.  Typed access is
     provided by the higher-level session layer.
+
+    Note: ``<resources>`` (attributes, bonuses, relationships, inventory) is not
+    stored in this dataclass and is therefore not serialized by ``save_state``.
     """
 
     path: Path                    # source file path (used as default save target)
@@ -189,7 +192,7 @@ def tick_clock(state: CampaignState, clock_id: str, amount: int = 1) -> Campaign
         if clock.get("id") == clock_id:
             segments = int(clock["segments"])
             filled = int(clock["filled"])
-            clock["filled"] = str(min(segments, filled + amount))
+            clock["filled"] = str(max(0, min(segments, filled + amount)))
             return new_state
     raise StateError(f"Clock '{clock_id}' not found in state")
 
@@ -325,21 +328,6 @@ def _build_safety_profile_elem(safety_profile: list[dict]) -> Element:
     return profile_elem
 
 
-def _indent(elem: Element, level: int = 0) -> None:
-    """Add pretty-print indentation to an ElementTree in place (Python 3.8 compat shim)."""
-    indent = "\n" + "  " * level
-    if len(elem):
-        elem.text = indent + "  "
-        elem.tail = indent
-        for child in elem:
-            _indent(child, level + 1)
-        child.tail = indent  # type: ignore[assignment]
-    else:
-        elem.tail = indent
-    if level == 0:
-        elem.tail = "\n"
-
-
 # ---------------------------------------------------------------------------
 # Persistence
 # ---------------------------------------------------------------------------
@@ -363,6 +351,8 @@ def save_state(state: CampaignState, path: Path | None = None) -> Path:
     root.append(_build_session_state_elem(state.session_state))
     root.append(_build_state_machines_elem(state.clocks, state.progress_tracks))
     root.append(_build_safety_profile_elem(state.safety_profile))
+    # TODO: <resources> (attributes, bonuses, relationships, inventory) is not held in
+    #       CampaignState and is therefore silently dropped on save.  Tracked for Phase 3.
 
     tree = ET.ElementTree(root)
     ET.indent(tree, space="  ")

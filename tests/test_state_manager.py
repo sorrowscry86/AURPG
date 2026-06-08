@@ -146,6 +146,23 @@ class TestTickClock:
         )
         assert new_mission["filled"] == original_mission["filled"]
 
+    def test_tick_clock_negative_amount_clamps_to_zero(self):
+        state = load_state(SAMPLE_XML)
+        # clk-danger-alarm-sweep starts at filled=3; subtracting 99 must not go below 0
+        new_state = tick_clock(state, "clk-danger-alarm-sweep", amount=-99)
+        clock = next(c for c in new_state.clocks if c["id"] == "clk-danger-alarm-sweep")
+        assert clock["filled"] == "0"
+
+    def test_tick_clock_zero_amount_is_noop(self):
+        state = load_state(SAMPLE_XML)
+        original_clock = next(
+            c for c in state.clocks if c["id"] == "clk-danger-alarm-sweep"
+        )
+        original_filled = original_clock["filled"]
+        new_state = tick_clock(state, "clk-danger-alarm-sweep", amount=0)
+        clock = next(c for c in new_state.clocks if c["id"] == "clk-danger-alarm-sweep")
+        assert clock["filled"] == original_filled
+
 
 # ---------------------------------------------------------------------------
 # set_stress
