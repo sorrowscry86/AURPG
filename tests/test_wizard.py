@@ -336,7 +336,7 @@ class TestRunWizard:
         """Return a callable that pops from the answers list on each call."""
         answers_iter = iter(answers)
 
-        def _fn(prompt: str = "") -> str:
+        def _fn(_prompt: str = "") -> str:
             return next(answers_iter)
 
         return _fn

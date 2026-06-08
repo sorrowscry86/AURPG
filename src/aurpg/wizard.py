@@ -19,7 +19,7 @@ Public API:
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Callable
 from xml.etree import ElementTree as ET
 from xml.etree.ElementTree import Element, SubElement
@@ -255,21 +255,6 @@ def config_to_state_xml(config: WizardConfig) -> str:
 # ---------------------------------------------------------------------------
 # Interactive wizard helpers
 # ---------------------------------------------------------------------------
-
-
-def _prompt_choice(prompt_fn: Callable[[str], str], prompt: str, valid: set[str]) -> str:
-    """Prompt repeatedly until the user enters a value in *valid*."""
-    while True:
-        answer = prompt_fn(prompt).strip()
-        if answer in valid:
-            return answer
-        prompt_fn(
-            f"  [!] Invalid choice '{answer}'. Valid options: {sorted(valid)}\n"
-            f"      Please enter one of the above: "
-        )
-        # Note: the call above is just for display — we loop to re-prompt properly.
-        # Re-implement as a simple loop to avoid double prompt_fn calls:
-        # (corrected below in a simpler form)
 
 
 def _ask_choice(prompt_fn: Callable[[str], str], prompt: str, valid: set[str]) -> str:
