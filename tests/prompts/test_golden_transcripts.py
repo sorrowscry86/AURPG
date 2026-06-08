@@ -20,6 +20,7 @@ from __future__ import annotations
 import os
 import re
 import warnings
+import xml.etree.ElementTree as ET
 from typing import Any
 
 import pytest
@@ -37,7 +38,7 @@ def _call_engine(
     campaign_state: str,
     player_input: str,
 ) -> str:
-    """Send one engine turn and return the assistant response text."""
+    """Send one engine turn and return concatenated text from all response blocks."""
     messages = [
         {
             "role": "user",
@@ -53,7 +54,9 @@ def _call_engine(
         system=system_prompt,
         messages=messages,
     )
-    return response.content[0].text
+    text_blocks = [block.text for block in response.content if block.type == "text"]
+    assert text_blocks, "No text blocks returned in API response"
+    return "\n".join(text_blocks)
 
 
 def _check_patterns(response: str, fixture: dict) -> list[str]:
@@ -138,18 +141,30 @@ def test_fixture_files_are_valid_yaml() -> None:
         assert isinstance(fixture["expected_patterns"], list)
 
 
-def test_system_prompt_xml_is_present(system_prompt: str) -> None:
-    assert "<aurpg_system_prompt" in system_prompt
-    assert "<hard_rules>" in system_prompt
-    assert "<resolution_engine>" in system_prompt
-    assert "<safety_and_consent_modules>" in system_prompt
+def test_system_prompt_is_well_formed_xml(system_prompt: str) -> None:
+    """System prompt must parse as valid XML and contain key structural sections."""
+    try:
+        root = ET.fromstring(system_prompt)
+    except ET.ParseError as e:
+        pytest.fail(f"System prompt is not well-formed XML: {e}")
+    assert root.tag == "aurpg_system_prompt", f"Unexpected root tag: {root.tag!r}"
+    assert root.find(".//hard_rules") is not None, "Missing <hard_rules> section"
+    assert root.find(".//resolution_engine") is not None, "Missing <resolution_engine> section"
+    assert root.find("safety_and_consent_modules") is not None, (
+        "Missing <safety_and_consent_modules> section"
+    )
 
 
-def test_campaign_state_xml_is_present(campaign_state: str) -> None:
-    assert "<aurpg_campaign_state" in campaign_state
-    assert "<session_state>" in campaign_state
-    assert "<state_machines>" in campaign_state
-    assert "<safety_profile>" in campaign_state
+def test_campaign_state_is_well_formed_xml(campaign_state: str) -> None:
+    """Campaign state must parse as valid XML and contain key structural sections."""
+    try:
+        root = ET.fromstring(campaign_state)
+    except ET.ParseError as e:
+        pytest.fail(f"Campaign state is not well-formed XML: {e}")
+    assert root.tag == "aurpg_campaign_state", f"Unexpected root tag: {root.tag!r}"
+    assert root.find("session_state") is not None, "Missing <session_state> section"
+    assert root.find("state_machines") is not None, "Missing <state_machines> section"
+    assert root.find("safety_profile") is not None, "Missing <safety_profile> section"
 
 
 def test_expected_patterns_are_valid_regex() -> None:

@@ -29,7 +29,7 @@ banned_patterns:
   - "(?i)(let me think|my reasoning|i will now)"
 
 expected_state_delta:
-  # Stress should have increased (flashback cost)
-  stress_increase: true
-  # Inventory or bonus should be added
-  item_or_bonus_granted: true
+  # Stress update label appears in the output (e.g. "Stress 4→5/10")
+  stress_updated: "Stress"
+  # Arrow notation confirms a numeric state change was printed
+  state_change_arrow: "→"

@@ -15,7 +15,7 @@ FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
 def load_fixture(name: str) -> dict:
     path = FIXTURES_DIR / f"{name}.yaml"
-    with path.open() as f:
+    with path.open(encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 
@@ -25,12 +25,12 @@ def all_fixture_names() -> list[str]:
 
 @pytest.fixture(scope="session")
 def system_prompt() -> str:
-    return SYSTEM_PROMPT_PATH.read_text()
+    return SYSTEM_PROMPT_PATH.read_text(encoding="utf-8")
 
 
 @pytest.fixture(scope="session")
 def campaign_state() -> str:
-    return CAMPAIGN_STATE_PATH.read_text()
+    return CAMPAIGN_STATE_PATH.read_text(encoding="utf-8")
 
 
 @pytest.fixture(scope="session")

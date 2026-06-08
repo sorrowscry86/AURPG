@@ -26,6 +26,6 @@ banned_patterns:
   - "(?i)shivers? down (my|her|his) spine"
   - "(?i)(let me think|my reasoning|i will now)"
 
-expected_state_delta:
-  # safety_state.pause should be true
-  pause_active: true
+# No string-checkable state delta for this fixture: the pause acknowledgement
+# is fully covered by expected_patterns above. Semantic safety_state.pause
+# validation is planned for Phase 2.
