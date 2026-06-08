@@ -47,6 +47,22 @@ class TestRenderLedger:
         from aurpg.cli.renderer import render_ledger
         assert "risky" in render_ledger(state)
 
+    def test_contains_track_id(self, state):
+        from aurpg.cli.renderer import render_ledger
+        if not state.progress_tracks:
+            pytest.skip("no progress tracks in sample")
+        result = render_ledger(state)
+        assert any(t["id"] in result for t in state.progress_tracks)
+
+    def test_track_ticks_computed_correctly(self, state):
+        from aurpg.cli.renderer import render_ledger
+        if not state.progress_tracks:
+            pytest.skip("no progress tracks in sample")
+        # verify at least one track renders with a numeric ticks value in "N/40" format
+        result = render_ledger(state)
+        import re
+        assert re.search(r"\d+/40", result), "Expected 'N/40' ticks format in ledger"
+
 
 class TestRenderCharacterSheet:
     def test_returns_string(self, state):

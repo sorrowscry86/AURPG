@@ -41,7 +41,9 @@ def render_ledger(state: CampaignState) -> str:
     if state.progress_tracks:
         lines.append("  Tracks:")
         for t in state.progress_tracks:
-            ticks = int(t.get("ticks", 0))
+            boxes_filled = int(t.get("boxes_filled", 0))
+            ticks_in_box = int(t.get("ticks_in_current_box", 0))
+            ticks = boxes_filled * 4 + ticks_in_box
             lines.append(f"    {t.get('id', '?')}: {ticks}/40 ticks")
 
     lines.append(_SEP)
