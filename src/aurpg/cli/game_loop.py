@@ -74,6 +74,25 @@ def play_session(
         if banner:
             print(banner)
 
+        if ss.get("pause", "false") == "true":
+            try:
+                raw = input("\n[PAUSED — type /quit to save and exit, or use a safety command to resume]\n> ").strip()
+            except (EOFError, KeyboardInterrupt):
+                print("\n[Interrupted — saving...]\n")
+                save_session(session, save_dir)
+                break
+            if raw == "/quit":
+                save_session(session, save_dir)
+                print("[Session saved. Goodbye!]")
+                break
+            # Let the player's input go through run_turn so safety commands
+            # ([Rewind], [Fast-Forward], etc.) are handled by the safety gate.
+            if raw:
+                session, response = run_turn(session, raw, client=client)
+                print(f"\n{response.raw_text}\n")
+                save_session(session, save_dir)
+            continue
+
         try:
             raw = input("\n> ").strip()
         except (EOFError, KeyboardInterrupt):

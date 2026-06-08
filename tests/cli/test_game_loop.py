@@ -114,3 +114,27 @@ class TestPlaySessionRecap:
 
         assert len(captured) == 1
         assert len(captured[0]) > len("I act.")  # recap was prepended
+
+
+class TestPlaySessionHardStop:
+    def test_hard_stop_exits_without_reading_input(self, session, mock_client, tmp_path):
+        import copy
+        from aurpg.cli.game_loop import play_session
+
+        state = copy.deepcopy(session.state)
+        state.session_state.setdefault("safety_state", {})["hard_stop"] = "true"
+        hard_stopped = Session(
+            id=session.id,
+            state=state,
+            system_prompt=session.system_prompt,
+            model=session.model,
+            system_prompt_path=session.system_prompt_path,
+        )
+
+        with patch("aurpg.cli.game_loop.run_turn") as mock_run, \
+             patch("builtins.input") as mock_input:
+            play_session(hard_stopped, save_dir=tmp_path, client=mock_client)
+
+        mock_run.assert_not_called()
+        mock_input.assert_not_called()
+        assert (tmp_path / session.id / "meta.json").exists()
