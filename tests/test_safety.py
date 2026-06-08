@@ -404,3 +404,83 @@ def test_apply_preserves_extra_keys_in_state():
     state = {**_base_safety_state(), "custom_flag": "important_value"}
     result = apply_safety_command(SafetyCommand.PAUSE, state)
     assert result["custom_flag"] == "important_value"
+
+
+# ---------------------------------------------------------------------------
+# build_ooc_response — command token stripped from echoed note (fix #1)
+# ---------------------------------------------------------------------------
+
+
+def test_build_ooc_response_strips_x_card_token_from_note():
+    """The raw [X-Card] sigil must not appear inside the echoed note clause."""
+    response = build_ooc_response(SafetyCommand.X_CARD, player_note="[X-Card] the violence was too graphic")
+    assert "[X-Card]" not in response
+    assert "[x-card]" not in response.lower() or "heard you" not in response.lower()
+
+
+def test_build_ooc_response_strips_hard_stop_token_from_note():
+    """The !enforce_hard_stop token must not appear in the echoed note clause."""
+    response = build_ooc_response(SafetyCommand.HARD_STOP, player_note="!enforce_hard_stop I need to stop")
+    assert "!enforce_hard_stop" not in response
+
+
+def test_build_ooc_response_strips_token_preserves_remaining_text():
+    """After stripping the token, any remaining text should appear in the response."""
+    response = build_ooc_response(SafetyCommand.PAUSE, player_note="[Pause] I need a moment")
+    assert "I need a moment" in response
+
+
+def test_build_ooc_response_token_only_note_produces_no_note_clause():
+    """A note that is only a command token should produce no 'I heard you' clause."""
+    response = build_ooc_response(SafetyCommand.X_CARD, player_note="[X-Card]")
+    assert "I heard you" not in response
+
+
+# ---------------------------------------------------------------------------
+# apply_safety_command — deepcopy mutation isolation (fix #2)
+# ---------------------------------------------------------------------------
+
+
+def test_apply_does_not_mutate_nested_values():
+    """deepcopy ensures nested mutable values in safety_state are not shared."""
+    nested_list = [1, 2, 3]
+    state = {**_base_safety_state(), "history": nested_list}
+    result = apply_safety_command(SafetyCommand.PAUSE, state)
+    # Mutate the returned copy's nested list; original must be unaffected
+    result["history"].append(99)
+    assert 99 not in state["history"]
+
+
+def test_apply_returned_nested_values_are_independent_objects():
+    """The nested value in the returned dict must be a different object."""
+    nested = {"key": "value"}
+    state = {**_base_safety_state(), "meta": nested}
+    result = apply_safety_command(SafetyCommand.X_CARD, state)
+    assert result["meta"] is not state["meta"]
+
+
+# ---------------------------------------------------------------------------
+# build_ooc_response — dots-only note edge case (fix #3)
+# ---------------------------------------------------------------------------
+
+
+def test_build_ooc_response_dots_only_note_produces_no_note_clause():
+    """A note consisting only of punctuation should not produce an 'I heard you' clause."""
+    response = build_ooc_response(SafetyCommand.PAUSE, player_note="...")
+    assert "I heard you" not in response
+
+
+def test_build_ooc_response_punctuation_only_note_produces_no_note_clause():
+    """A note of commas and exclamations only should not produce an 'I heard you' clause."""
+    response = build_ooc_response(SafetyCommand.X_CARD, player_note=".,!?")
+    assert "I heard you" not in response
+
+
+# ---------------------------------------------------------------------------
+# detect_safety_command — None input (fix #4)
+# ---------------------------------------------------------------------------
+
+
+def test_detect_returns_none_for_none_input():
+    """detect_safety_command(None) must return None without raising."""
+    assert detect_safety_command(None) is None

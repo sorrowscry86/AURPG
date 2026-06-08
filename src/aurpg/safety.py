@@ -22,6 +22,7 @@ Typical usage::
 
 from __future__ import annotations
 
+import copy
 import re
 from enum import Enum
 from typing import Any
@@ -67,7 +68,7 @@ _PATTERNS: list[tuple[SafetyCommand, re.Pattern[str]]] = [
 ]
 
 
-def detect_safety_command(player_input: str) -> SafetyCommand | None:
+def detect_safety_command(player_input: str | None) -> SafetyCommand | None:
     """Scan *player_input* for a safety command and return the first one found.
 
     Matching is case-insensitive and commands may appear anywhere within the
@@ -97,6 +98,25 @@ def detect_safety_command(player_input: str) -> SafetyCommand | None:
             earliest_command = command
 
     return earliest_command
+
+
+# ---------------------------------------------------------------------------
+# Internal helpers
+# ---------------------------------------------------------------------------
+
+
+def _strip_command_tokens(text: str) -> str:
+    """Remove all safety command tokens from *text* and collapse extra whitespace.
+
+    Runs every pattern in ``_PATTERNS`` over the text and deletes any matches,
+    then strips leading/trailing whitespace from the result.
+    """
+    result = text
+    for _cmd, pattern in _PATTERNS:
+        result = pattern.sub("", result)
+    # Collapse multiple spaces left behind by removal
+    result = re.sub(r" {2,}", " ", result)
+    return result.strip()
 
 
 # ---------------------------------------------------------------------------
@@ -141,10 +161,12 @@ def build_ooc_response(command: SafetyCommand, player_note: str = "") -> str:
 
     Args:
         command:     The :class:`SafetyCommand` that was detected.
-        player_note: Optional free-text context from the player's message
-                     (everything beyond the command token itself).  When
-                     provided it is woven into the acknowledgement so the
-                     player feels heard.
+        player_note: Optional free-text context from the player's message.
+                     Safety command tokens (e.g. ``[X-Card]``) are stripped
+                     automatically before embedding the note so the raw sigil
+                     is never echoed back to the player.  When a non-empty
+                     note remains after stripping it is woven into the
+                     acknowledgement so the player feels heard.
 
     Returns:
         A non-empty OOC acknowledgement string appropriate for the command.
@@ -152,8 +174,10 @@ def build_ooc_response(command: SafetyCommand, player_note: str = "") -> str:
     template = _OOC_TEMPLATES[command]
     note_clause = ""
     if player_note and player_note.strip():
-        stripped = player_note.strip().rstrip(".")
-        note_clause = f'I heard you: "{stripped}." '
+        cleaned = _strip_command_tokens(player_note)
+        stripped = cleaned.rstrip(".,!?")
+        if stripped:
+            note_clause = f'I heard you: "{stripped}." '
 
     return template.format(note_clause=note_clause)
 
@@ -166,8 +190,9 @@ def build_ooc_response(command: SafetyCommand, player_note: str = "") -> str:
 def apply_safety_command(command: SafetyCommand, safety_state: dict[str, Any]) -> dict[str, Any]:
     """Return a new safety-state dict reflecting the effect of *command*.
 
-    Does **not** mutate the input dict.  All keys from *safety_state* are
-    preserved; only the relevant fields are updated.
+    Does **not** mutate the input dict (uses :func:`copy.deepcopy`, so nested
+    mutable values are fully independent of the original).  All keys from
+    *safety_state* are preserved; only the relevant fields are updated.
 
     State update rules:
 
@@ -185,7 +210,7 @@ def apply_safety_command(command: SafetyCommand, safety_state: dict[str, Any]) -
     Returns:
         A new dict with updated fields.
     """
-    new_state: dict[str, Any] = dict(safety_state)  # shallow copy — no mutation
+    new_state: dict[str, Any] = copy.deepcopy(safety_state)
 
     if command in (SafetyCommand.X_CARD, SafetyCommand.HARD_STOP):
         new_state["hard_stop"] = True
