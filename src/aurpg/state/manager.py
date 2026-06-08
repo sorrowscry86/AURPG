@@ -364,10 +364,8 @@ def save_state(state: CampaignState, path: Path | None = None) -> Path:
     root.append(_build_state_machines_elem(state.clocks, state.progress_tracks))
     root.append(_build_safety_profile_elem(state.safety_profile))
 
-    _indent(root)
-
     tree = ET.ElementTree(root)
-    ET.indent(tree, space="  ")  # Python 3.9+ built-in; belt-and-suspenders with _indent
+    ET.indent(tree, space="  ")
     target.parent.mkdir(parents=True, exist_ok=True)
     tree.write(str(target), encoding="unicode", xml_declaration=False)
 
