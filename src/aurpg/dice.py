@@ -1,13 +1,13 @@
 """Dice oracle for AURPG.
 
-Provides seeded-deterministic and CSPRNG-backed roll functions for all dice
-expressions used by the system prompt spec.  Every public function accepts
+Provides seeded-deterministic and high-entropy seeded roll functions for all
+dice expressions used by the system prompt spec.  Every public function accepts
 ``rng`` as a keyword-only argument so tests can inject a seeded
 :class:`random.Random` instance and get reproducible sequences.
 
 Typical usage::
 
-    rng = make_rng()                          # CSPRNG (live play)
+    rng = make_rng()                          # high-entropy seeded (live play)
     action = roll_action(attribute=2, bonuses=1, rng=rng)
     c1, c2 = roll_challenge(rng=rng)
     squad  = roll_squad(n=3, rng=rng)
@@ -114,11 +114,11 @@ def make_rng(seed: int | None = None) -> random.Random:
 
     Returns:
         A :class:`random.Random` instance.  When *seed* is ``None`` the
-        instance is seeded via :func:`os.urandom`, giving CSPRNG-quality
-        entropy without requiring any external library.
+        instance is seeded via :func:`os.urandom`, giving high-entropy seeded
+        unpredictability in normal play without requiring any external library.
     """
     if seed is None:
-        # Seed from os.urandom for CSPRNG-quality unpredictability.
+        # Seed from os.urandom for high-entropy, unpredictable seeding.
         entropy = int.from_bytes(os.urandom(8), "big")
         return random.Random(entropy)
     return random.Random(seed)

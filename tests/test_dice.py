@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import random
-
 import pytest
 
 from aurpg.dice import (
@@ -226,7 +224,7 @@ def test_outcome_tier_members_exist():
 def _squad_with_fixed_dice(faces: list[int]) -> SquadRoll:
     """Helper: create a SquadRoll using a pre-determined sequence of die faces."""
     sequence = iter(faces)
-    mock_rng = type("MockRNG", (), {"randint": lambda self, a, b: next(sequence)})()
+    mock_rng = type("MockRNG", (), {"randint": lambda self, *_: next(sequence)})()
     return roll_squad(n=len(faces), rng=mock_rng)
 
 
@@ -352,3 +350,29 @@ def test_roll_squad_rng_is_keyword_only():
     rng = make_rng(seed=0)
     with pytest.raises(TypeError):
         roll_squad(2, rng)  # type: ignore[call-arg]
+
+
+# ---------------------------------------------------------------------------
+# roll_squad — out-of-range n raises ValueError
+# ---------------------------------------------------------------------------
+
+
+def test_roll_squad_n0_raises_value_error():
+    """n=0 is below the valid range (1–4) and must raise ValueError."""
+    rng = make_rng(seed=0)
+    with pytest.raises(ValueError):
+        roll_squad(n=0, rng=rng)
+
+
+def test_roll_squad_n5_raises_value_error():
+    """n=5 is above the valid range (1–4) and must raise ValueError."""
+    rng = make_rng(seed=0)
+    with pytest.raises(ValueError):
+        roll_squad(n=5, rng=rng)
+
+
+def test_roll_squad_negative_n_raises_value_error():
+    """Negative n is outside the valid range (1–4) and must raise ValueError."""
+    rng = make_rng(seed=0)
+    with pytest.raises(ValueError):
+        roll_squad(n=-1, rng=rng)
