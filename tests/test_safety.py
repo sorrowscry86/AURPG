@@ -294,8 +294,8 @@ def _base_safety_state() -> dict:
 def test_apply_x_card_sets_hard_stop_and_pause():
     state = _base_safety_state()
     result = apply_safety_command(SafetyCommand.X_CARD, state)
-    assert result["hard_stop"] is True
-    assert result["pause"] is True
+    assert result["hard_stop"] == "true"
+    assert result["pause"] == "true"
 
 
 def test_apply_x_card_sets_intensity_check_pending():
@@ -307,8 +307,8 @@ def test_apply_x_card_sets_intensity_check_pending():
 def test_apply_hard_stop_sets_hard_stop_and_pause():
     state = _base_safety_state()
     result = apply_safety_command(SafetyCommand.HARD_STOP, state)
-    assert result["hard_stop"] is True
-    assert result["pause"] is True
+    assert result["hard_stop"] == "true"
+    assert result["pause"] == "true"
 
 
 def test_apply_hard_stop_sets_intensity_check_pending():
@@ -320,7 +320,7 @@ def test_apply_hard_stop_sets_intensity_check_pending():
 def test_apply_pause_sets_pause():
     state = _base_safety_state()
     result = apply_safety_command(SafetyCommand.PAUSE, state)
-    assert result["pause"] is True
+    assert result["pause"] == "true"
 
 
 def test_apply_pause_sets_intensity_check_pending():

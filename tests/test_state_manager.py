@@ -260,22 +260,22 @@ class TestApplySafety:
         state = load_state(SAMPLE_XML)
         new_state = apply_safety(state, SafetyCommand.PAUSE)
         ss = new_state.session_state["safety_state"]
-        assert ss["pause"] is True
+        assert ss["pause"] == "true"
         assert ss["intensity_check"] == "pending"
 
     def test_x_card_sets_hard_stop_and_pause(self):
         state = load_state(SAMPLE_XML)
         new_state = apply_safety(state, SafetyCommand.X_CARD)
         ss = new_state.session_state["safety_state"]
-        assert ss["hard_stop"] is True
-        assert ss["pause"] is True
+        assert ss["hard_stop"] == "true"
+        assert ss["pause"] == "true"
         assert ss["intensity_check"] == "pending"
 
     def test_hard_stop_sets_hard_stop(self):
         state = load_state(SAMPLE_XML)
         new_state = apply_safety(state, SafetyCommand.HARD_STOP)
         ss = new_state.session_state["safety_state"]
-        assert ss["hard_stop"] is True
+        assert ss["hard_stop"] == "true"
 
     def test_rewind_sets_intensity_check_only(self):
         state = load_state(SAMPLE_XML)

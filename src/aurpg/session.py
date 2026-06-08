@@ -176,7 +176,7 @@ def run_turn(
     # --- Normal LLM turn ----------------------------------------------------
     campaign_state_xml = state_to_xml(session.state)
 
-    messages = assemble_prompt(session.system_prompt, campaign_state_xml, player_input)
+    messages = assemble_prompt(campaign_state_xml, player_input)
     engine_response = call_engine_with_retry(
         messages,
         session.system_prompt,
@@ -234,6 +234,8 @@ def save_session(session: Session, save_dir: Path) -> Path:
     save_state(session.state, state_path)
 
     # TODO: persist system_prompt_path in meta.json for CLI convenience (Phase 3)
+    # TODO: turn_history is runtime-only and not persisted; a loaded session always starts
+    #       with empty history. Full replay/restore is deferred to Phase 3+.
     meta = {
         "id": session.id,
         "model": session.model,

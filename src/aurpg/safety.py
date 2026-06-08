@@ -196,9 +196,9 @@ def apply_safety_command(command: SafetyCommand, safety_state: dict[str, Any]) -
 
     State update rules:
 
-    * ``X_CARD`` / ``HARD_STOP``: ``hard_stop=True``, ``pause=True``,
+    * ``X_CARD`` / ``HARD_STOP``: ``hard_stop="true"``, ``pause="true"``,
       ``intensity_check="pending"``
-    * ``PAUSE``: ``pause=True``, ``intensity_check="pending"``
+    * ``PAUSE``: ``pause="true"``, ``intensity_check="pending"``
     * ``REWIND`` / ``FAST_FORWARD``: ``intensity_check="pending"`` only;
       ``hard_stop`` and ``pause`` are left unchanged.
 
@@ -213,11 +213,11 @@ def apply_safety_command(command: SafetyCommand, safety_state: dict[str, Any]) -
     new_state: dict[str, Any] = copy.deepcopy(safety_state)
 
     if command in (SafetyCommand.X_CARD, SafetyCommand.HARD_STOP):
-        new_state["hard_stop"] = True
-        new_state["pause"] = True
+        new_state["hard_stop"] = "true"
+        new_state["pause"] = "true"
         new_state["intensity_check"] = "pending"
     elif command == SafetyCommand.PAUSE:
-        new_state["pause"] = True
+        new_state["pause"] = "true"
         new_state["intensity_check"] = "pending"
     elif command in (SafetyCommand.REWIND, SafetyCommand.FAST_FORWARD):
         new_state["intensity_check"] = "pending"

@@ -8,7 +8,7 @@ point.
 Typical usage::
 
     client = make_client()                          # reads ANTHROPIC_API_KEY
-    messages = assemble_prompt(system_xml, state_xml, player_input)
+    messages = assemble_prompt(state_xml, player_input)
     result = call_engine_with_retry(
         messages, system_xml, client=client, model="claude-sonnet-4-5"
     )
@@ -76,7 +76,6 @@ class EngineResponse:
 
 
 def assemble_prompt(
-    system_prompt_xml: str,  # noqa: ARG001 — passed separately as API `system`
     campaign_state_xml: str,
     player_input: str,
 ) -> list[dict]:
@@ -88,8 +87,6 @@ def assemble_prompt(
     ``client.messages.create`` — it does **not** appear in this list.
 
     Args:
-        system_prompt_xml:  The engine's system prompt (XML).  Not embedded
-                            here; provided for signature symmetry only.
         campaign_state_xml: The current serialised campaign state (XML).
         player_input:       The player's action / intent for this turn.
 

@@ -176,7 +176,7 @@ def test_safety_interrupt_stops_llm(tmp_path: Path) -> None:
         new_sess, response = run_turn(session, "[X-Card] I need to stop", client=mock_client)
 
     assert response.raw_text.startswith("[OOC — Safety]")
-    assert new_sess.state.session_state["safety_state"]["hard_stop"] is True
+    assert new_sess.state.session_state["safety_state"]["hard_stop"] == "true"
 
 
 # ---------------------------------------------------------------------------
@@ -258,3 +258,30 @@ def test_dice_seeded_determinism() -> None:
 
     assert isinstance(squad_a, SquadRoll)
     assert squad_a == squad_b
+
+
+# ---------------------------------------------------------------------------
+# Test 8 — state_to_xml round-trip after mutation
+# ---------------------------------------------------------------------------
+
+
+def test_state_xml_round_trip_after_safety_mutation(tmp_path: Path) -> None:
+    from aurpg.state.manager import apply_safety, state_to_xml
+    from aurpg.safety import SafetyCommand
+
+    state_path = _write_state(tmp_path)
+    session = new_session(state_path, _SYSTEM_PROMPT_PATH, model=_TEST_MODEL)
+
+    mutated_state = apply_safety(session.state, SafetyCommand.X_CARD)
+
+    xml_str = state_to_xml(mutated_state)
+    round_trip_path = tmp_path / "mutated.xml"
+    round_trip_path.write_text(xml_str, encoding="utf-8")
+
+    errors = validate(round_trip_path)
+    assert errors == [], f"Validation errors after safety mutation round-trip: {errors}"
+
+    from aurpg.state.manager import load_state
+    reloaded = load_state(round_trip_path)
+    assert reloaded.session_state["safety_state"]["hard_stop"] == "true"
+    assert reloaded.session_state["safety_state"]["pause"] == "true"

@@ -243,7 +243,7 @@ class TestRunTurnSafety:
     def test_safety_updates_session_state(self, session, mock_client):
         new_sess, _ = run_turn(session, "[X-Card]", client=mock_client)
         safety_state = new_sess.state.session_state.get("safety_state", {})
-        assert safety_state.get("hard_stop") is True
+        assert safety_state.get("hard_stop") == "true"
 
     def test_pause_command_does_not_call_llm(self, session, mock_client):
         with patch("aurpg.session.call_engine_with_retry") as mock_llm:
