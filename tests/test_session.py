@@ -12,8 +12,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from aurpg.llm import EngineResponse
-from aurpg.safety import SafetyCommand
-from aurpg.state.manager import CampaignState, load_state
+from aurpg.state.manager import CampaignState, append_turn
 from aurpg.session import (
     Session,
     build_recap_context,
@@ -403,8 +402,6 @@ class TestNeedsRecap:
     def test_false_when_below_threshold(self):
         session = new_session(SAMPLE_STATE_XML, SAMPLE_SYSTEM_PROMPT, model=TEST_MODEL)
         # Add 19 turns (threshold is 20)
-        from aurpg.state.manager import append_turn
-
         state = session.state
         for i in range(19):
             state = append_turn(state, {"turn": i})
@@ -420,8 +417,6 @@ class TestNeedsRecap:
 
     def test_true_when_at_threshold(self):
         session = new_session(SAMPLE_STATE_XML, SAMPLE_SYSTEM_PROMPT, model=TEST_MODEL)
-        from aurpg.state.manager import append_turn
-
         state = session.state
         for i in range(20):
             state = append_turn(state, {"turn": i})
@@ -437,8 +432,6 @@ class TestNeedsRecap:
 
     def test_true_when_above_threshold(self):
         session = new_session(SAMPLE_STATE_XML, SAMPLE_SYSTEM_PROMPT, model=TEST_MODEL)
-        from aurpg.state.manager import append_turn
-
         state = session.state
         for i in range(25):
             state = append_turn(state, {"turn": i})
@@ -454,8 +447,6 @@ class TestNeedsRecap:
 
     def test_custom_recap_threshold(self):
         session = new_session(SAMPLE_STATE_XML, SAMPLE_SYSTEM_PROMPT, model=TEST_MODEL)
-        from aurpg.state.manager import append_turn
-
         state = session.state
         for i in range(5):
             state = append_turn(state, {"turn": i})
@@ -489,8 +480,6 @@ class TestBuildRecapContext:
 
     def test_returns_nonempty_string_when_turns_exist(self):
         session = new_session(SAMPLE_STATE_XML, SAMPLE_SYSTEM_PROMPT, model=TEST_MODEL)
-        from aurpg.state.manager import append_turn
-
         state = append_turn(session.state, {"player_input": "I draw my sword.", "response": "Steel rings."})
         session = Session(
             id=session.id,
@@ -505,8 +494,6 @@ class TestBuildRecapContext:
 
     def test_recap_contains_turn_data(self):
         session = new_session(SAMPLE_STATE_XML, SAMPLE_SYSTEM_PROMPT, model=TEST_MODEL)
-        from aurpg.state.manager import append_turn
-
         state = append_turn(session.state, {"player_input": "unique-action-xyz"})
         session = Session(
             id=session.id,
@@ -521,8 +508,6 @@ class TestBuildRecapContext:
 
     def test_recap_limits_to_last_5_turns(self):
         session = new_session(SAMPLE_STATE_XML, SAMPLE_SYSTEM_PROMPT, model=TEST_MODEL)
-        from aurpg.state.manager import append_turn
-
         state = session.state
         for i in range(10):
             state = append_turn(state, {"turn_index": str(i), "player_input": f"action-{i}"})
@@ -543,8 +528,6 @@ class TestBuildRecapContext:
 
     def test_recap_returns_json_lines(self):
         session = new_session(SAMPLE_STATE_XML, SAMPLE_SYSTEM_PROMPT, model=TEST_MODEL)
-        from aurpg.state.manager import append_turn
-
         state = append_turn(session.state, {"player_input": "I look around."})
         session = Session(
             id=session.id,
