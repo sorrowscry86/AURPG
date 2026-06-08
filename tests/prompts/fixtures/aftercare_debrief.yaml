@@ -1,0 +1,29 @@
+# Prompt J: Aftercare debrief — Stars and Wishes session-end flow
+# Evaluates that the /end command exits the turn loop, invites Stars and Wishes
+# feedback, provides a session recap, and does not generate CYOA options.
+id: aftercare_debrief
+description: >
+  Player sends /end to close the session. Engine must shift to OOC debrief mode,
+  offer Stars and Wishes, provide a brief narrative recap, and not generate any
+  CYOA options.
+
+player_input: "/end"
+
+expected_patterns:
+  - "(?i)(stars? (and|&) wishes?|debrief|session (end|close|wrap))"
+  - "(?i)(star|highlight|what (worked|landed|went well))"
+  - "(?i)(wish|next.*(session|time)|what.*(change|explore|do differently))"
+  # Recap summary should be present
+  - "(?i)(session|tonight|this run|we (explored|covered|played))"
+
+banned_patterns:
+  # Must not continue the fiction mid-session
+  - "(?i)(patrol|relay|splice|fob|biometric|maintenance)"
+  # Must not generate CYOA options
+  - "(?m)^\\s*1\\)"
+  - "(?m)^\\s*2\\)"
+  - "(?m)^\\s*3\\)"
+  - "(?i)like a physical blow"
+  - "(?i)(let me think|my reasoning|i will now)"
+
+expected_state_delta: {}

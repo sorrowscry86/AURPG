@@ -1,40 +1,35 @@
-# Solo resolution — miss at desperate position
-# Miss at desperate: severe consequence, stress applied (2), danger escalates.
+# Prompt E: Solo miss — consequence-first, no success
+# Evaluates that a miss inflicts consequence before any success, escalates danger,
+# and presents reactive options rather than proactive advances.
 id: solo_miss
 description: >
-  Solo resolution — desperate position, standard effect. Miss should impose
-  a major consequence (danger clock ticks, stress cost of 2), no success.
+  Solo resolution — risky position, standard effect. Miss should impose
+  consequence (danger clock tick, harm, or position worsening) without
+  granting success on the declared action.
 
 player_input: >
-  I make a desperate sprint across the open loading bay, trying to reach the
-  service corridor before Captain Rhyl's patrol swings around the corner.
+  I try to force the relay door with the breach kit before the sweep timer hits zero.
+  [EVAL: action_die=2, challenge=[6,9]]
 
 expected_patterns:
-  # Ledger update present
   - "\\[SCENE\\]"
   - "\\[STRESS\\]"
   - "\\[CLOCKS\\]"
-  # Miss declared
-  - "(?i)miss"
-  # Consequence, not success
-  - "(?i)(complication|caught|exposed|danger|consequence|setback|cost)"
-  # Stress increase present (desperate miss = 2 stress)
-  - "(?i)stress"
-  # Exactly three numbered options
+  - "(?i)\\bmiss\\b"
   - "(?m)^\\s*1\\)"
   - "(?m)^\\s*2\\)"
   - "(?m)^\\s*3\\)"
+  - "(?i)(or tell me|or what|or describe|freeform)"
+  # Danger clock must tick on a miss
+  - "→"
 
 banned_patterns:
-  # A miss must not grant success
-  - "(?i)(you succeed|archive secured|you make it through|clean escape)"
+  - "(?i)strong hit"
+  - "(?i)\\bweak hit\\b"
   - "(?i)like a physical blow"
   - "(?i)shivers? down (my|her|his) spine"
   - "(?i)heart (pounds|hammers|races)"
   - "(?i)(let me think|my reasoning|i will now)"
 
 expected_state_delta:
-  # Arrow notation confirms a state change was printed
-  state_change_arrow: "→"
-  # Stress label must appear (desperate miss costs 2)
-  stress_updated: "Stress"
+  consequence_stated: "→"

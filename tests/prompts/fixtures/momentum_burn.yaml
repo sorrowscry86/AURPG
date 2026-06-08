@@ -1,0 +1,37 @@
+# Prompt F: Momentum burn — weak-hit flip to strong hit
+# Evaluates that the engine correctly processes a momentum burn:
+# recognises the die to cancel, upgrades the outcome tier, and resets momentum.
+id: momentum_burn
+description: >
+  Solo resolution — risky position, standard effect. Player pre-declares burn
+  of momentum (currently 6) to cancel the challenge die showing 6 (≤ momentum).
+  Expected: outcome upgrades from weak hit to strong hit; momentum resets to +2.
+
+player_input: >
+  I ghost a false maintenance ping to misdirect the guard sweep, and I'm burning
+  my momentum right now to make sure it lands — cancel whichever challenge die is
+  at or below my current momentum of 6.
+  [EVAL: action_die=3, challenge=[3,6]]
+
+expected_patterns:
+  - "\\[SCENE\\]"
+  - "\\[STRESS\\]"
+  - "\\[CLOCKS\\]"
+  - "(?i)strong hit"
+  - "(?i)(burn|burned|momentum)"
+  # Momentum must reset — look for +2 or "2" after momentum label
+  - "(?i)(momentum.*→.*\\+?2|momentum.*reset)"
+  - "(?m)^\\s*1\\)"
+  - "(?m)^\\s*2\\)"
+  - "(?m)^\\s*3\\)"
+  - "→"
+
+banned_patterns:
+  - "(?i)\\bweak hit\\b"
+  - "(?i)\\bmiss\\b"
+  - "(?i)like a physical blow"
+  - "(?i)heart (pounds|hammers|races)"
+  - "(?i)(let me think|my reasoning|i will now)"
+
+expected_state_delta:
+  momentum_reset: "+2"

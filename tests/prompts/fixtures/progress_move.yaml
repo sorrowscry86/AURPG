@@ -1,37 +1,35 @@
-# Progress Move — rolling completed boxes vs. two 1d10 challenge dice
-# "Unmask Archive Buyer" track: formidable rank, 3 boxes filled.
-# Progress Move rolls 3 (boxes) vs. 2d10. No action die.
+# Prompt H: Progress Move — weak hit on an extreme-rank track
+# Evaluates that the engine uses boxes_filled (not an action die) as the
+# progress score, correctly identifies the weak hit, and does not tick clocks.
 id: progress_move
 description: >
-  Progress Move — player attempts to resolve the "Unmask Archive Buyer" vow.
-  Engine should roll the number of completed progress boxes (3) vs. two 1d10
-  challenge dice with no action die. Outcome determines vow fulfillment or partial.
+  Progress Move on "Clear Mara's Name" (rank: extreme, boxes_filled: 2).
+  Roll = 2 progress boxes vs challenge dice [1, 4] → weak hit (beats 1 not 4).
+  No action die should be mentioned; partial success with complication.
 
 player_input: >
-  The data packet is open. I scan the transfer logs for the buyer's routing
-  signature — I'm cashing in everything I've uncovered about the archive buyer
-  to name them now. Progress Move on "Unmask Archive Buyer."
+  The evidence in this archive is enough. I'm ready — I make the Progress Move
+  on the "Clear Mara's Name" track.
+  [EVAL: progress_boxes=2, challenge=[1,4]]
 
 expected_patterns:
-  # Progress Move mechanic identified
-  - "(?i)(progress move|progress roll|vow|fulfill|unmask)"
-  # Roll description — progress boxes vs. challenge dice
-  - "(?i)(progress boxes?|boxes? filled|3 boxes?|boxes? vs)"
-  # No action die noted (or explicitly absent)
-  - "(?i)(no action die|progress only|boxes? rolled)"
-  # Outcome tier present
-  - "(?i)(strong hit|weak hit|miss)"
-  # Exactly three numbered options
+  - "\\[SCENE\\]"
+  - "\\[STRESS\\]"
+  - "\\[CLOCKS\\]"
+  - "(?i)(progress move|progress roll)"
+  - "(?i)\\bweak hit\\b"
   - "(?m)^\\s*1\\)"
   - "(?m)^\\s*2\\)"
   - "(?m)^\\s*3\\)"
 
 banned_patterns:
-  # Progress moves do not roll an action die
-  - "(?i)(1d6 \\+ |action score|attribute \\+)"
+  - "(?i)strong hit"
+  - "(?i)\\bmiss\\b"
+  - "(?i)action die"
+  - "(?i)1d6"
   - "(?i)like a physical blow"
-  - "(?i)shivers? down (my|her|his) spine"
+  - "(?i)heart (pounds|hammers|races)"
   - "(?i)(let me think|my reasoning|i will now)"
 
 expected_state_delta:
-  state_change_arrow: "→"
+  outcome_tier: "weak hit"
