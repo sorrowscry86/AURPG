@@ -333,6 +333,16 @@ def _build_safety_profile_elem(safety_profile: list[dict]) -> Element:
 # ---------------------------------------------------------------------------
 
 
+def state_to_xml(state: CampaignState) -> str:
+    """Serialise *state* to an XML string without writing to disk."""
+    root = ET.Element("aurpg_campaign_state", version="0.1-prototype")
+    root.append(_build_session_state_elem(state.session_state))
+    root.append(_build_state_machines_elem(state.clocks, state.progress_tracks))
+    root.append(_build_safety_profile_elem(state.safety_profile))
+    ET.indent(root, space="  ")
+    return ET.tostring(root, encoding="unicode")
+
+
 def save_state(state: CampaignState, path: Path | None = None) -> Path:
     """Serialise *state* back to XML and write it to disk.
 

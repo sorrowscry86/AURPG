@@ -62,15 +62,6 @@ def _make_engine_response(text: str = "Some narrative.\n1) Go left\n2) Go right\
     )
 
 
-def _make_mock_client(response: EngineResponse | None = None) -> MagicMock:
-    """Return a mock Anthropic client that yields a fake EngineResponse via the LLM layer."""
-    client = MagicMock()
-    if response is not None:
-        # call_engine_with_retry is patched in tests — client is passed through
-        pass
-    return client
-
-
 # ---------------------------------------------------------------------------
 # new_session
 # ---------------------------------------------------------------------------
@@ -206,6 +197,16 @@ class TestRunTurnNormal:
         with patch("aurpg.session.call_engine_with_retry", return_value=eng):
             _, response = run_turn(session, "I draw my sword.", client=mock_client)
         assert "The blade sings." in response.raw_text
+
+    def test_run_turn_propagates_llm_exception(self, session, mock_client):
+        original_history_len = len(session.state.turn_history)
+        with patch(
+            "aurpg.session.call_engine_with_retry", side_effect=RuntimeError("boom")
+        ):
+            with pytest.raises(RuntimeError, match="boom"):
+                run_turn(session, "I do something.", client=mock_client)
+        # Session state must be unchanged after the exception
+        assert len(session.state.turn_history) == original_history_len
 
 
 # ---------------------------------------------------------------------------

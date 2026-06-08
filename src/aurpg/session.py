@@ -34,6 +34,7 @@ from aurpg.state.manager import (
     apply_safety,
     load_state,
     save_state,
+    state_to_xml,
 )
 
 __all__ = [
@@ -55,7 +56,7 @@ _RECAP_WINDOW: int = 5
 # ---------------------------------------------------------------------------
 
 
-@dataclass
+@dataclass(frozen=True)
 class Session:
     """Live game session pairing a campaign state with LLM configuration.
 
@@ -144,6 +145,11 @@ def run_turn(
     Returns:
         A ``(new_session, engine_response)`` tuple where *new_session* reflects
         any state changes from this turn.
+
+    Raises:
+        anthropic.APIStatusError: Re-raised after all retries exhausted.
+        Exception: Any other exception from the LLM client propagates immediately.
+        The session state is unchanged if an exception is raised.
     """
     # --- Safety gate --------------------------------------------------------
     command: SafetyCommand | None = detect_safety_command(player_input)
@@ -168,45 +174,7 @@ def run_turn(
         return new_session, synthetic_response
 
     # --- Normal LLM turn ----------------------------------------------------
-    from xml.etree import ElementTree as ET
-    from xml.etree.ElementTree import Element, SubElement
-
-    # Serialise current state to an XML string without touching disk.
-    def _state_to_xml(state: CampaignState) -> str:
-        root = Element("aurpg_campaign_state")
-        root.set("version", "0.1-prototype")
-
-        # session_state
-        ss_elem = SubElement(root, "session_state")
-        for tag, attrs in state.session_state.items():
-            child = SubElement(ss_elem, tag)
-            for k, v in attrs.items():
-                child.set(k, str(v))
-
-        # state_machines
-        machines = SubElement(root, "state_machines")
-        clocks_el = SubElement(machines, "clocks")
-        for ca in state.clocks:
-            el = SubElement(clocks_el, "clock")
-            for k, v in ca.items():
-                el.set(k, str(v))
-        tracks_el = SubElement(machines, "progress_tracks")
-        for ta in state.progress_tracks:
-            el = SubElement(tracks_el, "track")
-            for k, v in ta.items():
-                el.set(k, str(v))
-
-        # safety_profile
-        profile = SubElement(root, "safety_profile")
-        for ca in state.safety_profile:
-            el = SubElement(profile, "content_category")
-            for k, v in ca.items():
-                el.set(k, str(v))
-
-        ET.indent(root, space="  ")
-        return ET.tostring(root, encoding="unicode")
-
-    campaign_state_xml = _state_to_xml(session.state)
+    campaign_state_xml = state_to_xml(session.state)
 
     messages = assemble_prompt(session.system_prompt, campaign_state_xml, player_input)
     engine_response = call_engine_with_retry(
@@ -265,6 +233,7 @@ def save_session(session: Session, save_dir: Path) -> Path:
     state_path = session_dir / "state.xml"
     save_state(session.state, state_path)
 
+    # TODO: persist system_prompt_path in meta.json for CLI convenience (Phase 3)
     meta = {
         "id": session.id,
         "model": session.model,
@@ -334,6 +303,9 @@ def needs_recap(session: Session) -> bool:
 
     Returns:
         ``True`` when ``len(session.state.turn_history) >= session.recap_threshold``.
+
+    Note: returns True on every call once the threshold is reached; callers are
+    responsible for acting on it.
     """
     return len(session.state.turn_history) >= session.recap_threshold
 
