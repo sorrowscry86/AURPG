@@ -76,6 +76,7 @@ class Session:
     model: str
     max_tokens: int = 1024
     recap_threshold: int = 20
+    system_prompt_path: str | None = None   # persisted in meta.json for CLI resume
 
 
 # ---------------------------------------------------------------------------
@@ -110,7 +111,13 @@ def new_session(
     state = load_state(state_path)
     system_prompt = system_prompt_path.read_text(encoding="utf-8")
     sid = session_id if session_id is not None else str(uuid.uuid4())
-    return Session(id=sid, state=state, system_prompt=system_prompt, model=model)
+    return Session(
+        id=sid,
+        state=state,
+        system_prompt=system_prompt,
+        model=model,
+        system_prompt_path=str(system_prompt_path),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -233,58 +240,84 @@ def save_session(session: Session, save_dir: Path) -> Path:
     state_path = session_dir / "state.xml"
     save_state(session.state, state_path)
 
-    # TODO: persist system_prompt_path in meta.json for CLI convenience (Phase 3)
-    # TODO: turn_history is runtime-only and not persisted; a loaded session always starts
-    #       with empty history. Full replay/restore is deferred to Phase 3+.
     meta = {
         "id": session.id,
         "model": session.model,
         "max_tokens": session.max_tokens,
         "recap_threshold": session.recap_threshold,
+        "system_prompt_path": session.system_prompt_path,
     }
-    meta_path = session_dir / "meta.json"
-    meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+    (session_dir / "meta.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
+
+    turns_path = session_dir / "turns.jsonl"
+    with turns_path.open("w", encoding="utf-8") as f:
+        for turn in session.state.turn_history:
+            f.write(json.dumps(turn) + "\n")
 
     return session_dir
 
 
-def load_session(save_dir: Path, session_id: str, system_prompt_path: Path) -> Session:
+def load_session(
+    save_dir: Path,
+    session_id: str,
+    system_prompt_path: Path | None = None,
+) -> Session:
     """Reconstruct a :class:`Session` from a previously saved directory.
 
-    Reads ``meta.json`` for configuration and ``state.xml`` for the campaign
-    state.  The system prompt is reloaded from *system_prompt_path* (the
-    original file path is not persisted with the session).
+    Reads ``meta.json`` for configuration, ``state.xml`` for the campaign
+    state, and ``turns.jsonl`` (if present) to restore turn history.
+
+    The system prompt path is resolved in priority order:
+    1. The explicit *system_prompt_path* argument (if provided).
+    2. The ``"system_prompt_path"`` key stored in ``meta.json``.
+    3. Raises :exc:`OSError` if neither is available.
 
     Args:
         save_dir:           Root directory used when saving (same as for :func:`save_session`).
         session_id:         The session UUID used when saving.
-        system_prompt_path: Path to the system prompt XML file.
+        system_prompt_path: Optional override path to the system prompt XML file.
 
     Returns:
-        A reconstructed :class:`Session`.
+        A reconstructed :class:`Session` with turn history restored.
 
     Raises:
-        OSError:    If the session directory or required files are missing.
+        OSError:    If the session directory or required files are missing, or if
+                    the system prompt path cannot be resolved.
         StateError: If the saved ``state.xml`` fails validation.
         KeyError:   If ``meta.json`` is missing expected fields.
     """
     session_dir = save_dir / session_id
 
-    meta_path = session_dir / "meta.json"
-    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    meta = json.loads((session_dir / "meta.json").read_text(encoding="utf-8"))
 
-    state_path = session_dir / "state.xml"
-    state = load_state(state_path)
+    # Resolve system prompt path: explicit arg > meta.json > error
+    if system_prompt_path is None:
+        stored = meta.get("system_prompt_path")
+        if not stored:
+            raise OSError(
+                f"system_prompt_path not in meta.json for session {session_id!r}; "
+                "pass it explicitly"
+            )
+        system_prompt_path = Path(stored)
 
-    system_prompt = system_prompt_path.read_text(encoding="utf-8")
+    state = load_state(session_dir / "state.xml")
+
+    # Restore turn history from turns.jsonl
+    turns_path = session_dir / "turns.jsonl"
+    if turns_path.exists():
+        for line in turns_path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if line:
+                state.turn_history.append(json.loads(line))
 
     return Session(
         id=meta["id"],
         state=state,
-        system_prompt=system_prompt,
+        system_prompt=system_prompt_path.read_text(encoding="utf-8"),
         model=meta["model"],
         max_tokens=meta["max_tokens"],
         recap_threshold=meta["recap_threshold"],
+        system_prompt_path=str(system_prompt_path),
     )
 
 

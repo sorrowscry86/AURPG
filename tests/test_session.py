@@ -543,3 +543,64 @@ class TestBuildRecapContext:
         for line in lines:
             parsed = json.loads(line)
             assert isinstance(parsed, dict)
+
+
+# ---------------------------------------------------------------------------
+# TestSaveLoadPersistence — turn_history and system_prompt_path round-trip
+# ---------------------------------------------------------------------------
+
+
+class TestSaveLoadPersistence:
+    @pytest.fixture
+    def session_with_turns(self):
+        import copy as _copy
+        base = new_session(SAMPLE_STATE_XML, SAMPLE_SYSTEM_PROMPT, model=TEST_MODEL)
+        state = _copy.deepcopy(base.state)
+        state.turn_history = [{"player_input": "test", "raw_response": "resp"}]
+        return Session(
+            id=base.id,
+            state=state,
+            system_prompt=base.system_prompt,
+            model=base.model,
+            system_prompt_path=str(SAMPLE_SYSTEM_PROMPT),
+        )
+
+    def test_save_writes_turns_jsonl(self, session_with_turns, tmp_path):
+        save_session(session_with_turns, tmp_path)
+        turns_file = tmp_path / session_with_turns.id / "turns.jsonl"
+        assert turns_file.exists()
+
+    def test_save_turns_jsonl_has_correct_content(self, session_with_turns, tmp_path):
+        save_session(session_with_turns, tmp_path)
+        turns_file = tmp_path / session_with_turns.id / "turns.jsonl"
+        lines = turns_file.read_text(encoding="utf-8").strip().splitlines()
+        assert len(lines) == 1
+        record = json.loads(lines[0])
+        assert record["player_input"] == "test"
+
+    def test_save_persists_system_prompt_path_in_meta(self, session_with_turns, tmp_path):
+        save_session(session_with_turns, tmp_path)
+        meta = json.loads((tmp_path / session_with_turns.id / "meta.json").read_text())
+        assert meta["system_prompt_path"] == str(SAMPLE_SYSTEM_PROMPT)
+
+    def test_load_restores_turn_history(self, session_with_turns, tmp_path):
+        save_session(session_with_turns, tmp_path)
+        loaded = load_session(tmp_path, session_with_turns.id)
+        assert len(loaded.state.turn_history) == 1
+        assert loaded.state.turn_history[0]["player_input"] == "test"
+
+    def test_load_restores_system_prompt_path(self, session_with_turns, tmp_path):
+        save_session(session_with_turns, tmp_path)
+        loaded = load_session(tmp_path, session_with_turns.id)
+        assert loaded.system_prompt_path == str(SAMPLE_SYSTEM_PROMPT)
+
+    def test_load_without_system_prompt_path_uses_meta(self, session_with_turns, tmp_path):
+        save_session(session_with_turns, tmp_path)
+        loaded = load_session(tmp_path, session_with_turns.id)
+        assert loaded.system_prompt is not None
+        assert len(loaded.system_prompt) > 0
+
+    def test_load_explicit_path_overrides_meta(self, session_with_turns, tmp_path):
+        save_session(session_with_turns, tmp_path)
+        loaded = load_session(tmp_path, session_with_turns.id, system_prompt_path=SAMPLE_SYSTEM_PROMPT)
+        assert loaded.system_prompt is not None

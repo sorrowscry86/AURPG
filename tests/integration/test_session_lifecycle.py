@@ -149,14 +149,14 @@ def test_save_and_resume(tmp_path: Path) -> None:
     assert loaded_session.model == session.model
     assert loaded_session.recap_threshold == session.recap_threshold
 
-    # turn_history is runtime-only; the loaded session starts empty
-    assert loaded_session.state.turn_history == []
+    # turn_history is now persisted; loaded session restores all 5 turns
+    assert len(loaded_session.state.turn_history) == 5
 
     with patch("aurpg.session.call_engine_with_retry", return_value=_FAKE_RESPONSE):
         for i in range(5):
             loaded_session, _ = run_turn(loaded_session, f"resumed action {i}", client=mock_client)
 
-    assert len(loaded_session.state.turn_history) == 5
+    assert len(loaded_session.state.turn_history) == 10
 
 
 # ---------------------------------------------------------------------------
