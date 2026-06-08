@@ -1,0 +1,35 @@
+# Prompt A: baseline risky action
+# Corresponds to the canonical evaluation prompt in docs/PROMPT_USAGE_GUIDE.md
+id: baseline_risky_action
+description: >
+  Solo resolution — risky position, standard effect. Weak hit should advance
+  both the mission clock and the danger clock.
+
+player_input: >
+  I splice my wiretap into the relay and hold my breath while the patrol passes.
+
+expected_patterns:
+  # Ledger line present
+  - "\\[SCENE\\]"
+  - "\\[STRESS\\]"
+  - "\\[CLOCKS\\]"
+  # Move resolution line with outcome tier
+  - "(?i)(strong hit|weak hit|miss)"
+  # Exactly three numbered options
+  - "(?m)^\\s*1\\)"
+  - "(?m)^\\s*2\\)"
+  - "(?m)^\\s*3\\)"
+  # Freeform invite
+  - "(?i)(or tell me|or what|or describe)"
+
+banned_patterns:
+  - "(?i)like a physical blow"
+  - "(?i)shivers? down (my|her|his) spine"
+  - "(?i)heart (pounds|hammers|races)"
+  - "(?i)breath catches"
+  # No chain-of-thought leakage
+  - "(?i)(let me think|my reasoning|i will now)"
+
+expected_state_delta:
+  # At least one clock should have advanced — validate text contains arrow notation
+  clock_advancement: "→"

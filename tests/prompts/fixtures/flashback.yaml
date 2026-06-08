@@ -1,0 +1,35 @@
+# Prompt B: flashback use
+# Corresponds to the canonical evaluation prompt in docs/PROMPT_USAGE_GUIDE.md
+id: flashback
+description: >
+  Flashback mechanic — simple preparation, stress cost 1, present-scene advantage granted.
+
+player_input: >
+  Flashback: I bribed a dock clerk for a temporary access key before the mission.
+
+expected_patterns:
+  # Flashback acknowledgement
+  - "(?i)flashback (accepted|acknowledged)"
+  # Stress update present
+  - "(?i)stress"
+  # Concrete advantage stated
+  - "(?i)(access.?key|position shift|controlled|advantage)"
+  # Exactly three numbered options
+  - "(?m)^\\s*1\\)"
+  - "(?m)^\\s*2\\)"
+  - "(?m)^\\s*3\\)"
+  # Freeform invite
+  - "(?i)(or tell me|or what|or describe)"
+
+banned_patterns:
+  - "(?i)like a physical blow"
+  - "(?i)shivers? down (my|her|his) spine"
+  - "(?i)heart (pounds|hammers|races)"
+  - "(?i)breath catches"
+  - "(?i)(let me think|my reasoning|i will now)"
+
+expected_state_delta:
+  # Stress should have increased (flashback cost)
+  stress_increase: true
+  # Inventory or bonus should be added
+  item_or_bonus_granted: true
