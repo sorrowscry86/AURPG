@@ -31,472 +31,301 @@ The XML prompt prototype establishes the initial contract for:
 
 ---
 
-## 1. Goals & Non-Goals
+## Goals and Non-Goals
 
 ### Goals
 
-- **Prompt-as-engine**: The LLM is the runtime. The XML system prompt encodes all rules, resolution logic, safety guardrails, and output contracts. No application server is required to play.
-- **Unified resolution**: A single engine handles PbtA-style conversational move triggers, FitD position/effect consequence logic, and Ironsworn-style solo resolution without the player switching modes manually.
-- **Verifiable state**: Every mechanical action produces explicit, inspectable state updates (clocks, tracks, stress, momentum). The state is never implicit or hidden in prose.
-- **Safety-first**: Consent limits are captured before play begins and enforced throughout. Safety commands are parsed client-side before the LLM ever sees the turn.
-- **Platform-agnostic entry**: The prompt-only form works in any LLM chat interface. The Python application layer wraps it for structured sessions without requiring a new interface.
-- **Closed alpha readiness**: The system must support 3–5 external testers playing unassisted sessions within 6 months of the roadmap start date.
+- Run a complete solo or squad RPG session from campaign creation to session end using only an LLM and a structured XML system prompt.
+- Produce fiction-first narrative output that is mechanically verifiable: every consequence traces to an explicit dice resolution and a state update.
+- Maintain persistent, inspectable game state across an entire session without external memory or database support.
+- Enforce safety and consent contracts in real time through in-context command parsing, without external moderation infrastructure.
+- Remain model-agnostic: the prompt should produce correct behaviour on any reasoning-capable LLM that supports system instructions and 32k+ context.
 
 ### Non-Goals
 
-- **Multiplayer server**: Real-time multi-player session management is out of scope for v1.
-- **Persistent hosted character sheets**: No web storage, database, or account system in v1.
-- **Visual or graphical UI**: Text output only. A richer UI is a post-alpha concern.
-- **Rules enforcement without an LLM**: The engine is not designed to function without a capable language model; it does not fall back to a deterministic rules parser.
-- **Coverage of all TTRPG systems**: AURPG defines its own unified ruleset derived from PbtA/FitD/Ironsworn. It is not a generic TTRPG adapter.
-- **Real-time dice rolling service**: Dice are resolved inside the LLM context. An external dice oracle is a nice-to-have for transparency, not a core requirement.
+- Replacing dedicated TTRPG virtual tabletops (Roll20, Foundry) for visual, multi-user, or real-time play.
+- Implementing a persistent server, user accounts, or session storage outside the LLM context window.
+- Supporting more than one active player character per session in this version (multi-PC squad play is a future expansion).
+- Generating or managing visual assets, audio, or map layouts.
+- Enforcing game balance through hard-coded outcome tables — balance is achieved through probability tuning and GM-posture rules, not branching logic.
 
 ---
 
-## 2. Architecture Overview
+## Architecture Overview
 
-AURPG has four layers. The prompt and state layers are functional today; the application and interface layers are built during Phases 1–3 of the roadmap.
+AURPG is a **prompt-as-engine** architecture. The LLM is the entire runtime. There is no application server, no database, and no external game logic. The three key layers are:
 
 ```
-┌──────────────────────────────────────────────────────┐
-│  Player Interface  (CLI: aurpg new / play / resume)  │
-├──────────────────────────────────────────────────────┤
-│  Session Manager                                     │
-│  (wizard · turn loop · save · resume · recap)        │
-├──────────────────────────────────────────────────────┤
-│  LLM Integration                                     │
-│  (prompt assembly · API call · response parse)       │
-├──────────────────────────────────────────────────────┤
-│  State Manager   │   Safety Parser   │  Dice Oracle  │
-│  (load/validate/ │   (pre-LLM inter- │  (seeded /    │
-│   mutate/persist)│    rupt detection)│   live CSPRNG)│
-└──────────────────────────────────────────────────────┘
-         │                                  │
-  Anthropic API                    Disk (JSON / XML)
-  (LLM runtime)                    (session persistence)
+┌─────────────────────────────────────────────────┐
+│  System Prompt (XML)                            │
+│  ├─ Hard rules (L1–L5)                          │
+│  ├─ Resolution modules (solo / squad / clocks)  │
+│  ├─ Output format modules (ledger / somatic)    │
+│  ├─ Safety and consent modules                  │
+│  └─ Orchestration modes                         │
+├─────────────────────────────────────────────────┤
+│  Campaign State (XML, injected into context)    │
+│  ├─ session_state (scene, player, resolution)   │
+│  ├─ resources (attributes, inventory, bonds)    │
+│  ├─ state_machines (clocks, progress tracks)    │
+│  └─ safety_profile                              │
+├─────────────────────────────────────────────────┤
+│  Player Turn (user message)                     │
+│  └─ Declared action, intent, or safety command  │
+└─────────────────────────────────────────────────┘
+         ↓ LLM resolves per rules_modules ↓
+┌─────────────────────────────────────────────────┐
+│  Engine Turn (assistant message)                │
+│  ├─ Ledger update (state delta)                 │
+│  ├─ Narrative prose (deep-POV, somatic-first)   │
+│  └─ Exactly 3 CYOA options + freeform invite    │
+└─────────────────────────────────────────────────┘
 ```
 
-**Data flow for a single turn:**
+**No branching code.** The LLM reads the rules from the system prompt, evaluates the fiction, applies the resolution logic in-context, and produces structured output. Mechanical correctness is enforced by the prompt's hard rules and verified by the evaluation harness in `docs/PROMPT_USAGE_GUIDE.md`.
 
-1. Player types an action.
-2. Safety Parser scans for interrupt commands before anything reaches the LLM.
-3. Dice Oracle resolves any dice expressions needed to assemble the prompt context.
-4. LLM Integration assembles the prompt: system XML + serialized state XML + condensed turn history + player message.
-5. Anthropic API returns a structured response.
-6. Response is parsed and validated against the output contract.
-7. State Manager applies mutations (clock advances, stress changes, momentum updates).
-8. Rendered output (ledger + prose + three options) is shown to the player.
-9. Session is persisted to disk.
+**Future compiler layer.** A planned prompt compiler will accept the XML modules and campaign state as inputs and assemble the final prompt string for any target model, handling token budget, module selection, and schema versioning. This is not yet implemented.
 
 ---
 
-## 3. State Model
+## State Model
 
-Session state is divided into five XML containers. The `<turn_seed>` container is used only in evaluation scenarios and is not present in live session files.
+All game state is represented as XML attributes and elements in the `aurpg_campaign_state` document. State is divided into five containers:
 
-### `<session_state>`
+### `session_state`
 
-| Field | Type | Constraints | Notes |
-|-------|------|-------------|-------|
-| `campaign.id` | string | non-empty | Unique session identifier |
-| `campaign.title` | string | non-empty | Campaign display name |
-| `campaign.genre` | string | non-empty | e.g. `cyberpunk_heist`, `dark_fantasy` |
-| `campaign.tone` | string | non-empty | e.g. `high_tension_character_driven` |
-| `campaign.canon_mode` | enum | `strict_continuity` \| `loose` | How strictly prior events bind future narration |
-| `campaign.orchestration_mode` | enum | `strict_manual` \| `collaborative_consult` \| `generative_synthesis` | GM-assistance posture |
-| `play_state.mode` | enum | `solo` \| `squad` | Determines resolution formula |
-| `play_state.scene_id` | string | non-empty | Scene identifier for continuity |
-| `play_state.location` | string | non-empty | Current fictional location |
-| `play_state.objective` | string | non-empty | Active scene objective |
-| `play_state.time_marker` | string | optional | In-world time reference |
-| `player_state.character_name` | string | non-empty | — |
-| `player_state.deep_pov` | bool | always `true` | Reserved; controls narration frame |
-| `player_state.stress` | int | 0–12 | 12 = incapacitated |
-| `player_state.momentum` | int | −6 to +10 | −6 = minimum (cannot burn negative momentum) |
-| `player_state.harm` | string \| null | optional | Descriptive harm tag(s) |
-| `player_state.load` | enum | `light` \| `normal` \| `heavy` \| `overloaded` | Affects gear availability |
-| `resolution_state.position` | enum | `controlled` \| `risky` \| `desperate` | Consequence severity multiplier |
-| `resolution_state.effect` | enum | `limited` \| `standard` \| `great` | Success scale |
-| `resolution_state.move_trigger` | string \| `none` | optional | Active move name |
-| `resolution_state.stakes` | string | optional | Narrative summary of what's at risk |
-| `safety_state.hard_stop` | bool | — | True while `!enforce_hard_stop` is active |
-| `safety_state.pause` | bool | — | True while `[Pause]` OOC mode is active |
-| `safety_state.intensity_check` | enum | `none` \| `pending` \| `resolved` | Check-in state |
+Runtime context for the current scene and resolution. Fields:
 
-### `<resources>`
+| Field | Type | Description |
+|---|---|---|
+| `campaign.id` | string | Unique campaign identifier |
+| `campaign.orchestration_mode` | enum | `strict_manual` / `collaborative_consult` / `generative_synthesis` |
+| `play_state.mode` | enum | `solo` / `squad` |
+| `play_state.scene_id` | string | Current scene label |
+| `player_state.stress` | int 0–10 | Accumulated stress; breaks at 10 |
+| `player_state.momentum` | int −6–+10 | Momentum buffer for outcome upgrade |
+| `player_state.harm` | string | Active harm label(s) or `none` |
+| `resolution_state.position` | enum | `controlled` / `risky` / `desperate` |
+| `resolution_state.effect` | enum | `limited` / `standard` / `great` |
+| `safety_state.hard_stop` | bool | `!enforce_hard_stop` active |
+| `safety_state.pause` | bool | `[Pause]` OOC mode active |
 
-| Container | Field | Type | Constraints |
-|-----------|-------|------|-------------|
-| `attributes` | `name` | enum | `edge` \| `heart` \| `iron` \| `shadow` \| `wits` |
-| `attributes` | `value` | int | 1–4 (campaign start); may be modified by advancement |
-| `bonuses` | `source` | string | Free text describing the bonus origin |
-| `bonuses` | `value` | int | +1 or +2 typically |
-| `relationships` | `npc` | string | NPC name |
-| `relationships` | `status` | string | Free text (e.g. `uneasy_ally`, `actively_hunting`) |
-| `relationships` | `clock_ref` | string \| empty | ID of associated clock, if any |
-| `inventory` | `name` | string | Item name |
-| `inventory` | `tags` | string | Comma-separated capability tags |
+### `resources`
 
-### `<state_machines>`
+Character capabilities and relationships. Attributes (edge / heart / iron / shadow / wits) hold integer values set during campaign creation. Bonuses are transient modifiers from items or setup. Relationships track NPC status and link to relevant clocks.
 
-**Clocks**
+### `state_machines`
 
-| Field | Type | Constraints |
-|-------|------|-------------|
-| `id` | string | unique, kebab-case prefix `clk-` |
-| `name` | string | display name |
-| `type` | enum | `standard` \| `danger` \| `racing` \| `linked` \| `mission` |
-| `segments` | enum | `4` \| `6` \| `8` |
-| `filled` | int | 0 to `segments` (filled = segments → clock complete) |
-| `linked_to` | string \| empty | prerequisite clock id; this clock cannot tick until linked clock is complete |
+All progress clocks and progress tracks. Each clock has a `filled` counter against its `segments` cap. Each track has `boxes_filled` (0–10) and `ticks_in_current_box` (0–3). The engine advances these explicitly every turn.
 
-**Progress Tracks**
+### `safety_profile`
 
-| Field | Type | Constraints |
-|-------|------|-------------|
-| `id` | string | unique, kebab-case prefix `trk-` |
-| `name` | string | display name |
-| `rank` | enum | `troublesome` \| `dangerous` \| `formidable` \| `extreme` \| `epic` |
-| `boxes_filled` | int | 0–10 |
-| `ticks_in_current_box` | int | 0–3 (4 ticks fills a box) |
+Per-category consent settings (horror / health / relationships / social_issues) with green / yellow / red status. The engine reads this before narrating any content in a sensitive category and soft-pedals or blocks it according to the active setting.
 
-Progress on success by rank: troublesome → 3 boxes, dangerous → 2 boxes, formidable → 1 box, extreme → 2 ticks, epic → 1 tick.
+### `turn_seed` (evaluation use only)
 
-### `<safety_profile>`
-
-| Field | Type | Constraints |
-|-------|------|-------------|
-| `name` | enum | `horror` \| `health` \| `relationships` \| `social_issues` |
-| `status` | enum | `green` \| `yellow` \| `red` |
-| `guidance` | string | Free text instruction injected into prompt context |
-
-Semantics: `green` = enthusiastic engagement; `yellow` = veiled, softened, or fade-to-black treatment; `red` = blocked entirely.
-
-### `<turn_seed>` (evaluation use only)
-
-| Field | Type | Notes |
-|-------|------|-------|
-| `player_intent` | string | Free-text description of the intended player action |
-| `expected_resolution_path` | string | Human-authored resolution notes for golden transcript matching |
-
-`<turn_seed>` must not appear in production session files; it exists only in evaluation fixtures.
+Present only in test fixtures. Describes the intended player action and expected resolution path for golden-transcript evaluation.
 
 ---
 
-## 4. LLM Integration
-
-### Model selection
-
-| Use case | Recommended model |
-|----------|------------------|
-| Live play (speed-optimized) | `claude-sonnet-4-6` |
-| Evaluation / quality gate | `claude-opus-4-8` |
-| Rapid CI mock validation | Cached cassette responses (no API call) |
+## LLM Integration
 
 ### Prompt assembly
 
-The prompt sent to the API has three parts, assembled in order:
+The session is initialised by loading two documents into the model context:
 
-1. **System message** — the full `aurpg_system_prompt_prototype.xml` content wrapped in `<aurpg_system_prompt>` tags. This is static per version and should be cached with the Anthropic prompt-caching API to reduce token costs.
-2. **State injection** — the current `<aurpg_campaign_state>` XML serialized inline, immediately after the system prompt.
-3. **Conversation history** — the condensed turn history (see Session Lifecycle for recap rules), followed by the player's current message as the final user turn.
+1. **System prompt** (`aurpg_system_prompt_prototype.xml`) — loaded as the system instruction.
+2. **Campaign state** (`aurpg_campaign_state.xml`) — injected as the first user or system message, clearly labelled as current game state.
 
-### Structured output
+The system prompt is static for the session. The campaign state is mutable; the engine's output updates it in-context and the player or tooling exports updated state as needed.
 
-The engine response must follow the output contract in this order:
+### Model requirements
 
-```
-[LEDGER]
-<explicit state updates: clocks ticked, tracks marked, stress/momentum changed>
+- Minimum 32k context window (128k+ recommended for long campaigns with summary history).
+- Instruction-following fidelity sufficient to respect hard rules L1–L5 consistently.
+- Structured output: the engine must produce the ledger line, resolution line, prose, and three options in order every turn.
 
-[PROSE]
-<deep-POV narrative of the turn outcome>
+### Token budget management
 
-[OPTIONS]
-1. <first choice>
-2. <second choice>
-3. <third choice>
-Or tell me what you do.
-```
+The note-insert rule (every 4 turns) and session-summary rule (every 8 turns or on scene change) are the primary tools for managing context growth. The summary crystallises prior continuity into a compact paragraph; the note insert refreshes active clock state without re-reading the full state block.
 
-The application layer parses this structure to separate display components and extract state mutations.
+### Dice resolution
 
-### Token budget and caching
-
-- Cache the static system prompt with Anthropic's prompt caching feature.
-- Track cumulative input tokens per session. When the rolling context (state + history) exceeds 80% of the model's context limit, trigger a recap summarization turn.
-- The recap turn asks the model to condense turn history into a narrative summary; the summary replaces the raw turn log.
+The engine simulates dice rolls using its own sampling during inference. There is no external dice service. The player may override a roll by stating values explicitly; the engine accepts player-declared results and resolves from them.
 
 ---
 
-## 5. Session Lifecycle
+## Session Lifecycle
 
 ```
-Pre-session
-    │
-    ▼
-[aurpg new] ──► Campaign Creation Wizard (4 stages)
-                    Stage 1: System & Metadata
-                    Stage 2: Character Generation
-                    Stage 3: Safety Checklist
-                    Stage 4: Orchestration Mode
-    │
-    ▼
-Active Session ◄────────────────────────────────┐
-    │                                           │
-    ├── Receive player input                    │
-    ├── Safety Parser (pre-LLM scan)            │
-    │       ├── Safety command detected ──► OOC calibration ──► resume or rewind
-    │       └── No interrupt → continue        │
-    ├── Assemble prompt                         │
-    ├── LLM API call                            │
-    ├── Parse & validate response               │
-    ├── Apply state mutations                   │
-    ├── Render to player                        │
-    ├── Persist session to disk                 │
-    └── Check context length                   │
-            ├── Under 80% limit ───────────────►│ (loop)
-            └── Over 80% limit → Recap turn ───►│
-    │
-    ├── [Pause] ──► OOC mode ──► [resume] ──► Active Session
-    ├── [aurpg quit] ──► Save ──► Suspended
-    │
-    ▼
-Suspended
-    │
-    └── [aurpg resume] ──► load state + inject recap context ──► Active Session
-    │
-    └── [/end in-session] ──► Aftercare Debrief (Stars & Wishes)
-    │
-    ▼
-Ended
+Boot → Campaign Creation Wizard → Scene Initialisation
+  → [ Turn Loop ] → Scene Transition → [ Turn Loop ] → ...
+    → Session End → Stars & Wishes debrief → State Export
 ```
 
-### Save format
+### Boot
 
-Sessions are persisted as JSON files in `~/.aurpg/sessions/<session-id>.json`:
+Engine receives the system prompt and any pre-existing campaign state. If no state exists, the Campaign Creation Wizard runs through its four stages before the first scene.
 
-```json
-{
-  "session_id": "...",
-  "character_name": "...",
-  "campaign_title": "...",
-  "last_played": "ISO-8601 timestamp",
-  "state": { /* all five XML containers as nested JSON */ },
-  "turn_history": [ /* array of {player, engine} message pairs, condensed after recap */ ]
-}
-```
+### Campaign Creation Wizard
 
-### Resume
+Four stages, each gated on player confirmation:
 
-On resume, the session manager:
-1. Loads and validates the JSON file against the Pydantic schema.
-2. Serializes the state back to XML for prompt injection.
-3. Prepends a `<recap>` block to the conversation history summarizing the last session.
-4. Enters the turn loop.
+1. **System and Metadata** — genre, tone, scale, play mode.
+2. **Character Generation** — protagonist concept, attributes, bonds, inventory, starting pressures.
+3. **Safety Checklist** — green / yellow / red boundaries per content category.
+4. **Orchestration Mode** — GM-posture locked; play begins.
 
-### Recap trigger
+### Turn Loop
 
-When accumulated input tokens (system + state + history) exceed 80% of the model context limit, the engine runs a single summarization turn: the model is asked to write a 150–300 word narrative recap of events so far. The recap replaces the raw turn log and is injected at the top of subsequent conversation history.
+Each turn:
+1. Player declares action (or safety command).
+2. Engine checks safety state first (L1 / hard stop / pause).
+3. Engine applies fiction-first loop (fiction → move trigger → resolution → state update → prose → options).
+4. At turn 4, 8, 12, … a note-insert ledger refresh is delivered.
+5. At turn 8, 16, … or on scene transition, a session summary is crystallised.
+
+### Scene Transition
+
+On a major narrative beat, location shift, or player-initiated time jump:
+- Engine closes the current scene with a summary paragraph.
+- Engine updates scene fields in `play_state`.
+- Clock and track states carry forward.
+
+### Session End
+
+Triggered by player request or `[Fast-Forward]` to end of session:
+- Stars and Wishes debrief offered.
+- Full state export produced in XML.
+- Any unresolved clocks and tracks noted for next session.
 
 ---
 
-## 6. Game Rules Layer
+## Game Rules Layer
 
-All rules live inside `aurpg_system_prompt_prototype.xml`. The Python application layer treats them as a black box — it does not re-implement rules in code. The application layer's only mechanical responsibilities are dice rolling and state schema validation.
+Rules are enforced entirely through the prompt's `<rules_modules>` and `<output_format_modules>` sections. There is no hard-coded branching, no external rule lookup, and no validation outside the LLM context.
 
-### Fiction-first loop
+### Mechanics hierarchy
 
-The engine must not call for a roll unless the action creates genuine uncertainty, risk, opposition, or meaningful cost. Consequence-free narration never triggers a roll. This is Directive L2.
+1. **Hard rules (L1–L5)** — always applied, cannot be overridden by narrative context.
+2. **Fiction-first loop** — determines whether a move fires before any roll logic runs.
+3. **Attribute and resolution rules** — define how scores are calculated and outcomes mapped.
+4. **Position / effect matrix** — modifies consequence severity based on scene framing.
+5. **Clock and track rules** — govern how state machines advance each turn.
+6. **Output format rules** — govern ledger, somatic-first protocol, and choice count.
 
-### Solo resolution
+### Genre overlays (planned)
 
-```
-Action_Score = min(1d6 + Attribute + Bonuses, 10)
-Compare against two 1d10 challenge dice:
-  Strong hit  →  beats both dice
-  Weak hit    →  beats one die
-  Miss        →  beats neither die
-```
-
-Momentum mechanics:
-- **Burning momentum**: Spend current momentum value to cancel one challenge die equal to or below the momentum value. Momentum then resets per campaign defaults (typically to +2).
-- **Negative momentum**: If momentum is negative when rolling, cancel any action-die face matching the absolute value of momentum before reading the result.
-
-### Squad resolution
-
-```
-Roll Nd6 (N = 1–4, set by scale/teamwork/setup quality)
-Read the highest single die:
-  Critical (multiple 6s)  →  strong hit + bonus
-  Strong hit              →  one 6
-  Weak hit                →  4 or 5
-  Miss                    →  1 to 3
-```
-
-### Flashback
-
-| Prep complexity | Stress cost |
-|----------------|-------------|
-| Simple, plausible | 1 |
-| Complex, requires planning | 2 |
-| Elaborate or unlikely | 3 |
-
-Resolve immediately; update stress; grant concrete advantage or clarify fiction before returning to the current scene.
-
-### Position × Effect consequence matrix
-
-|  | Limited effect | Standard effect | Great effect |
-|--|---------------|-----------------|--------------|
-| **Controlled** | Minor cost or delay | Clean success | Success + bonus |
-| **Risky** | Partial success + cost | Success + standard cost | Success + reduced cost |
-| **Desperate** | Hard choice or setback | Success + severe cost | Success + notable cost |
-
-Misses always inflict consequence first; success does not occur unless a move explicitly allows it.
-
-### Progress clocks
-
-| Type | Ticking rule |
-|------|-------------|
-| Standard | Advance on relevant action outcomes or time passage |
-| Danger | Tick on miss; tick on weak hit when fiction escalates threat |
-| Racing | Parallel clocks; first to fill wins the race |
-| Linked | Does not tick until prerequisite clock is filled |
-| Mission | Advances only on mission-scale events |
-
-### Progress tracks
-
-10 boxes × 4 ticks per box. Advancement on a successful action:
-
-| Rank | Progress on success |
-|------|-------------------|
-| Troublesome | 3 boxes |
-| Dangerous | 2 boxes |
-| Formidable | 1 box |
-| Extreme | 2 ticks |
-| Epic | 1 tick |
-
-**Progress Move**: When resolving a long-form objective, roll the count of filled boxes against two 1d10 challenge dice. No action die is used. Strong/weak/miss outcomes apply as normal.
+The system prompt currently bundles all rules in a single XML document. Future versions will split the core rules (resolution, clocks, safety) from genre-specific overlays (e.g., cyberpunk setting tags, relationship ladder for social play, injury-debuff tables for tactical combat). Overlays will be injected as additional context blocks alongside the core system prompt.
 
 ---
 
-## 7. API / Interface Design
+## Error Handling and Safety
 
-### CLI (Phase 3)
+### Content safety
 
-```
-aurpg new                 Start Campaign Creation Wizard; save and enter play
-aurpg play <session-id>   Enter the turn loop for an existing session
-aurpg resume              Interactive session picker; loads and resumes
-aurpg list                Show all saved sessions with timestamps and scene summaries
-aurpg quit                Save session and exit gracefully
-```
+Safety is the highest-priority module, evaluated before any fiction is generated each turn. The consent matrix governs content at the category level. Live safety commands override all other rules immediately.
 
-In-session slash commands (available during the turn loop):
+| Command | Effect |
+|---|---|
+| `[X-Card]` | Remove last generated content, restabilise scene, request redirect. |
+| `[Rewind]` | Roll back narrative to agreed prior state, restart. |
+| `[Fast-Forward]` | Fade sensitive content, preserve consequences, resume at next beat. |
+| `[Pause]` | Freeze fiction, open OOC calibration exchange. |
+| `!enforce_hard_stop` | Terminate current action path, wait for new instruction. |
 
-```
-/sheet     Print the full character sheet (attributes, bonuses, stress, momentum, harm, inventory)
-/clocks    Print all active clocks and progress tracks with current fill state
-/save      Force-save the session without ending it
-/end       Trigger the aftercare debrief and close the session cleanly
-```
+### Model output errors
 
-In-session safety commands (intercepted before the LLM):
+The prompt's hard rules provide the primary defence against malformed output, but LLM behaviour is non-deterministic. The evaluation harness (`PROMPT_USAGE_GUIDE.md`) defines the pass criteria for each turn. Common failure modes and mitigations:
 
-```
-[X-Card]              Stop; remove unsafe element; restabilize; ask for new direction
-[Rewind]              Roll back to a prior state index; summarize what remains canon
-[Fast-Forward]        Skip sensitive detail; preserve consequences; resume at next beat
-[Pause]               Open OOC calibration mode; fiction is frozen
-!enforce_hard_stop    Terminate current action path immediately; wait for new instructions
-```
+| Failure | Mitigation |
+|---|---|
+| Fewer or more than 3 options returned | Repeat the L5 rule at the note-insert point; OOC correction. |
+| State not updated explicitly | L4 mandate in every resolution step; player OOC correction. |
+| Banned cliché phrases in prose | `<creative_tropes_mandate>` enforces a scrub pass; player correction reinforces the pattern. |
+| Hidden chain-of-thought leaked | L3 rule; player correction removes the pattern from context. |
+| Safety command not parsed | Retry with explicit command repetition; escalate to `!enforce_hard_stop`. |
 
-### REST API (post-alpha)
+### Out-of-context player input
 
-A thin HTTP wrapper around the session manager will be defined after the CLI is stable. Endpoints will mirror CLI operations: `POST /sessions`, `POST /sessions/{id}/turns`, `GET /sessions/{id}/state`, `DELETE /sessions/{id}`.
+When the player sends ambiguous, out-of-game, or non-action messages, the engine defaults to asking a clarifying question rather than inventing fiction (matching `strict_manual` posture). In `generative_synthesis` mode, the engine may propose a scene direction and ask for confirmation.
 
 ---
 
-## 8. Error Handling & Safety
+## Testing Strategy
 
-### Safety command handling
+### Current state
 
-Safety commands are **always detected client-side** in `src/aurpg/safety.py` before the player's message is sent to the LLM. The engine never relies on the model to recognize a safety interrupt.
+Testing is manual and transcript-based. The three canonical evaluation prompts in `docs/PROMPT_USAGE_GUIDE.md` define the baseline pass criteria. Results are recorded in the guide's evaluation table.
 
-| Command | Handler action |
-|---------|---------------|
-| `[X-Card]` | Freeze turn loop; emit OOC calibration prompt; wait for player redirection |
-| `[Rewind]` | Load the state snapshot at the requested index; emit canon summary |
-| `[Fast-Forward]` | Emit skip acknowledgment; advance scene to next meaningful beat |
-| `[Pause]` | Enter OOC mode; print pause banner; wait for `/resume` |
-| `!enforce_hard_stop` | Set `safety_state.hard_stop = true`; terminate turn loop; await new instructions |
+### Planned test levels
 
-### LLM API errors
+**Level 1 — Golden transcript tests**
 
-| Error type | Response |
-|------------|----------|
-| Network timeout / 5xx | Exponential backoff retry (max 4 attempts: 2s / 4s / 8s / 16s) |
-| Malformed / missing output contract sections | Retry up to 3 times with an explicit contract reminder prepended to the prompt |
-| Rate limit (429) | Backoff per Anthropic retry-after header |
-| Persistent failure after retries | Surface error to player; offer to save session and exit |
+Each test loads the system prompt + sample campaign state, sends a canonical player action, and asserts:
+- Ledger line format matches `[SCENE] ... [STRESS] ...` pattern.
+- A resolution line is present with move name, attribute, position/effect, and outcome tier.
+- Exactly 3 numbered options appear before the freeform invite.
+- No banned phrase appears in the prose section.
+- State delta values match expected values (clock fills, stress, momentum).
 
-### Output contract violations
+**Level 2 — Edge-case prompts**
 
-The response parser checks for:
-- Exactly 3 options present
-- No first-person player-character actions authored by the engine (L1 violation)
-- No banned cliché phrases
-- Explicit state ledger block present on resolution turns
+Cover: momentum burn, linked clock unlock, progress move on an epic-rank track, consecutive safety commands, scene transition with summary injection, squad mode critical.
 
-Violations are logged. In live play, the turn is retried once with a constraint reinforcement injection. If the violation persists, the raw response is shown with a warning banner.
+**Level 3 — Session lifecycle tests**
 
-### State corruption
+Full session from Campaign Creation Wizard through scene transition through Stars and Wishes debrief. Assert that all four wizard stages complete, that the state export round-trips correctly, and that the session summary appears at the expected turn intervals.
 
-- All state mutations are validated against Pydantic schemas before writing.
-- Turn history is append-only; [Rewind] does not delete entries — it sets a replay pointer.
-- If a session file fails schema validation on load, the last valid checkpoint (one turn prior) is offered.
+### Test infrastructure (planned)
 
-### Content policy (red-category blocking)
+Tests will live in `tests/prompts/`. Each test is a YAML fixture specifying:
+- `system_prompt_path`
+- `campaign_state_path`
+- `player_input`
+- `expected_patterns` (regex list)
+- `expected_state_delta` (field: value map)
+- `banned_patterns` (regex list)
 
-When a `<content_category>` has `status="red"`, the prompt instruction explicitly tells the model to refuse generation in that domain. Red-category blocks are enforced at the prompt level; the safety parser additionally flags any player input that clearly targets a red domain before it reaches the model.
+A pytest harness loads fixtures, calls the LLM API, and evaluates the response against expected patterns and string-valued state delta entries. Semantic state delta validation (boolean fields) is planned for Phase 2.
 
 ---
 
-## 9. Testing Strategy
+## Roadmap
 
-### Three tiers
+### Phase 0 — Prompt specification (current)
 
-**Tier 1 — Unit tests** (`tests/unit/`): No LLM calls. No network.
-- Dice oracle: verify distribution, seeded reproducibility, all roll expressions
-- State schema: Pydantic validation accepts valid state, rejects invalid values
-- State parser: XML → Pydantic → XML round-trip for all five containers
-- Safety parser: correctly identifies all five safety command tokens, including inline placement in longer messages
+- [x] XML system prompt prototype (v0.2)
+- [x] Sample campaign state (Neon Ash Protocol)
+- [x] Evaluation harness and canonical test prompts
+- [x] Canonical attributes, stress/recovery, harm tracks, serialization rules
+- [x] Example transcripts for solo, squad, flashback, progress move, safety interrupts
+- [x] Finalize DESIGN.md (this document)
+- [x] pyproject.toml and project scaffolding
+- [x] Golden-transcript test harness (offline structural tests + live-API tests)
 
-**Tier 2 — Integration tests** (`tests/integration/`): No live LLM calls. Uses mocked or cassette-recorded API responses.
-- Full session lifecycle: wizard → 5 turns → save → resume → 5 more turns → aftercare debrief
-- State mutation correctness: each turn result produces the expected state delta for fixed dice seeds
-- Safety interrupt lifecycle: each of the five commands triggers the correct handler and correctly resumes or terminates
-- Recap trigger: session compresses history correctly at the 80% token threshold
+### Phase 1 — Prompt hardening
 
-**Tier 3 — Evaluation tests** (`tests/evaluation/`): Live LLM calls. Requires `ANTHROPIC_API_KEY`.
-- 10 golden transcript scenarios covering every mechanic (see ROADMAP Phase 0 for the full list)
-- Output contract validation: ledger present, exactly 3 options, no banned phrases, correct resolution mode
-- LLM judge: a secondary model call evaluates prose quality, agency preservation, and fictional coherence
+- [ ] Squad mode multi-character coordination examples
+- [ ] Genre overlay prototype (cyberpunk module extracted from core)
+- [ ] Session lifecycle full golden transcript (campaign creation → debrief)
+- [ ] State round-trip export/import validation
 
-### CI strategy
+### Phase 2 — Evaluation harness
 
-| Trigger | Tests run | LLM calls |
-|---------|-----------|-----------|
-| Pull request | Tier 1 + Tier 2 (mocked) | None (fork-safe) |
-| Merge to `main` | Tier 1 + Tier 2 + Tier 3 (live) | Yes |
-| Nightly schedule | Tier 3 only (live) | Yes — detects model drift |
+- [ ] pytest fixture runner calling LLM API
+- [ ] Automated banned-phrase detection
+- [ ] State delta assertion framework
+- [ ] CI integration for regression testing on prompt changes
 
-Evaluation tests skip gracefully via `pytest.mark.skipif(not os.getenv("ANTHROPIC_API_KEY"))` so PR runs from forks never fail on missing secrets.
+### Phase 3 — Thin application layer
 
----
+- [ ] Python CLI wrapper: load prompt + state, send player input, display output, auto-export state
+- [ ] State persistence to local file between turns
+- [ ] Optional dice service integration (replace in-context dice simulation)
 
-## 10. Roadmap
+### Phase 4 — Web interface
 
-See [`docs/ROADMAP.md`](ROADMAP.md) for the full six-phase plan from current spec to closed player alpha, including per-phase task checklists, exit criteria, estimated durations, and a risk/mitigation matrix.
-
-**Summary timeline**: ~5–6 months from spec hardening to closed player testing.
+- [ ] Minimal browser UI: prompt loader, turn input, ledger display, clock visualisation
+- [ ] Session save/load via exported XML files
+- [ ] MCP / API integration for on-demand lore lookup (faction data, world details)
