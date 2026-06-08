@@ -287,7 +287,7 @@ Tests will live in `tests/prompts/`. Each test is a YAML fixture specifying:
 - `expected_state_delta` (field: value map)
 - `banned_patterns` (regex list)
 
-A pytest harness will load fixtures, call the LLM API, and evaluate the response against each field. The harness is not yet implemented.
+A pytest harness loads fixtures, calls the LLM API, and evaluates the response against expected patterns and string-valued state delta entries. Semantic state delta validation (boolean fields) is planned for Phase 2.
 
 ---
 
@@ -300,9 +300,9 @@ A pytest harness will load fixtures, call the LLM API, and evaluate the response
 - [x] Evaluation harness and canonical test prompts
 - [x] Canonical attributes, stress/recovery, harm tracks, serialization rules
 - [x] Example transcripts for solo, squad, flashback, progress move, safety interrupts
-- [ ] Finalize DESIGN.md (this document — in progress)
-- [ ] pyproject.toml and project scaffolding
-- [ ] Automated golden-transcript test harness
+- [x] Finalize DESIGN.md (this document)
+- [x] pyproject.toml and project scaffolding
+- [x] Golden-transcript test harness (offline structural tests + live-API tests)
 
 ### Phase 1 — Prompt hardening
 

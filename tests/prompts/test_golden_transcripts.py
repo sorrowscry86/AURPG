@@ -5,21 +5,29 @@ set. Run them explicitly:
 
     pytest -m live tests/prompts/
 
+Override the model with the AURPG_TEST_MODEL environment variable:
+
+    AURPG_TEST_MODEL=claude-sonnet-4-6 pytest -m live tests/prompts/
+
 Each test:
 1. Loads the system prompt + sample campaign state.
 2. Sends a canonical player action from a YAML fixture.
-3. Asserts expected patterns are present and banned patterns are absent.
+3. Asserts expected patterns are present, banned patterns are absent,
+   and string-valued state deltas appear in the response.
 """
 from __future__ import annotations
 
+import os
 import re
+import warnings
 from typing import Any
 
 import pytest
 
 from .conftest import all_fixture_names, load_fixture
 
-MODEL = "claude-haiku-4-5-20251001"  # fast, cheap; swap to sonnet/opus for higher fidelity
+DEFAULT_MODEL = "claude-haiku-4-5-20251001"  # fast, cheap; override via AURPG_TEST_MODEL
+MODEL = os.environ.get("AURPG_TEST_MODEL", DEFAULT_MODEL)
 MAX_TOKENS = 1024
 
 
@@ -63,6 +71,30 @@ def _check_patterns(response: str, fixture: dict) -> list[str]:
     return failures
 
 
+def _check_state_delta(response: str, fixture: dict) -> list[str]:
+    """Validate expected_state_delta entries where possible.
+
+    String values are treated as literal substring checks against the response.
+    Boolean/complex values require semantic state parsing (planned for Phase 2)
+    and emit a UserWarning rather than silently passing.
+    """
+    failures: list[str] = []
+    for key, value in fixture.get("expected_state_delta", {}).items():
+        if isinstance(value, str):
+            if value not in response:
+                failures.append(
+                    f"MISSING state delta {key!r}: expected substring {value!r} in response"
+                )
+        else:
+            warnings.warn(
+                f"State delta check '{key}={value}' requires semantic parsing "
+                f"(Phase 2 — not yet implemented); skipped.",
+                UserWarning,
+                stacklevel=2,
+            )
+    return failures
+
+
 @pytest.mark.live
 @pytest.mark.parametrize("fixture_name", all_fixture_names())
 def test_golden_transcript(
@@ -82,7 +114,7 @@ def test_golden_transcript(
         player_input=player_input,
     )
 
-    failures = _check_patterns(response, fixture)
+    failures = _check_patterns(response, fixture) + _check_state_delta(response, fixture)
 
     assert not failures, (
         f"\nFixture: {fixture_name}\n"
