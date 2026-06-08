@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from aurpg.safety import SafetyCommand, apply_safety_command, build_ooc_response, detect_safety_command
 
 
