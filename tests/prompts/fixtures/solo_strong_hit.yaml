@@ -1,0 +1,38 @@
+# Solo resolution — strong hit
+# Controlled position, great effect: the action succeeds cleanly with amplified impact.
+id: solo_strong_hit
+description: >
+  Solo resolution — controlled position, great effect. Strong hit should
+  yield full success, no cost, and preferably improved momentum or position.
+
+player_input: >
+  I use the security backdoor that's already open to slip past the vault perimeter
+  and plant the extraction tap on the archive node — clean and quiet.
+
+expected_patterns:
+  # Ledger update present
+  - "\\[SCENE\\]"
+  - "\\[CLOCKS\\]"
+  # Strong hit declared
+  - "(?i)strong hit"
+  # No cost imposed on a strong hit
+  - "(?i)(momentum|position improved|clean|no complication|no cost)"
+  # Exactly three numbered options
+  - "(?m)^\\s*1\\)"
+  - "(?m)^\\s*2\\)"
+  - "(?m)^\\s*3\\)"
+  # Freeform invite
+  - "(?i)(or tell me|or what|or describe)"
+
+banned_patterns:
+  # Strong hits must not impose costs
+  - "(?i)(you pay|you suffer|you lose|complication|danger advances|alarm)"
+  - "(?i)like a physical blow"
+  - "(?i)shivers? down (my|her|his) spine"
+  - "(?i)heart (pounds|hammers|races)"
+  - "(?i)breath catches"
+  - "(?i)(let me think|my reasoning|i will now)"
+
+expected_state_delta:
+  # Mission clock should have advanced
+  clock_advancement: "→"

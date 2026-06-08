@@ -1,0 +1,37 @@
+# Progress Move — rolling completed boxes vs. two 1d10 challenge dice
+# "Unmask Archive Buyer" track: formidable rank, 3 boxes filled.
+# Progress Move rolls 3 (boxes) vs. 2d10. No action die.
+id: progress_move
+description: >
+  Progress Move — player attempts to resolve the "Unmask Archive Buyer" vow.
+  Engine should roll the number of completed progress boxes (3) vs. two 1d10
+  challenge dice with no action die. Outcome determines vow fulfillment or partial.
+
+player_input: >
+  The data packet is open. I scan the transfer logs for the buyer's routing
+  signature — I'm cashing in everything I've uncovered about the archive buyer
+  to name them now. Progress Move on "Unmask Archive Buyer."
+
+expected_patterns:
+  # Progress Move mechanic identified
+  - "(?i)(progress move|progress roll|vow|fulfill|unmask)"
+  # Roll description — progress boxes vs. challenge dice
+  - "(?i)(progress boxes?|boxes? filled|3 boxes?|boxes? vs)"
+  # No action die noted (or explicitly absent)
+  - "(?i)(no action die|progress only|boxes? rolled)"
+  # Outcome tier present
+  - "(?i)(strong hit|weak hit|miss)"
+  # Exactly three numbered options
+  - "(?m)^\\s*1\\)"
+  - "(?m)^\\s*2\\)"
+  - "(?m)^\\s*3\\)"
+
+banned_patterns:
+  # Progress moves do not roll an action die
+  - "(?i)(1d6 \\+ |action score|attribute \\+)"
+  - "(?i)like a physical blow"
+  - "(?i)shivers? down (my|her|his) spine"
+  - "(?i)(let me think|my reasoning|i will now)"
+
+expected_state_delta:
+  state_change_arrow: "→"

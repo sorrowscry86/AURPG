@@ -1,0 +1,40 @@
+# Solo resolution — miss at desperate position
+# Miss at desperate: severe consequence, stress applied (2), danger escalates.
+id: solo_miss
+description: >
+  Solo resolution — desperate position, standard effect. Miss should impose
+  a major consequence (danger clock ticks, stress cost of 2), no success.
+
+player_input: >
+  I make a desperate sprint across the open loading bay, trying to reach the
+  service corridor before Captain Rhyl's patrol swings around the corner.
+
+expected_patterns:
+  # Ledger update present
+  - "\\[SCENE\\]"
+  - "\\[STRESS\\]"
+  - "\\[CLOCKS\\]"
+  # Miss declared
+  - "(?i)miss"
+  # Consequence, not success
+  - "(?i)(complication|caught|exposed|danger|consequence|setback|cost)"
+  # Stress increase present (desperate miss = 2 stress)
+  - "(?i)stress"
+  # Exactly three numbered options
+  - "(?m)^\\s*1\\)"
+  - "(?m)^\\s*2\\)"
+  - "(?m)^\\s*3\\)"
+
+banned_patterns:
+  # A miss must not grant success
+  - "(?i)(you succeed|archive secured|you make it through|clean escape)"
+  - "(?i)like a physical blow"
+  - "(?i)shivers? down (my|her|his) spine"
+  - "(?i)heart (pounds|hammers|races)"
+  - "(?i)(let me think|my reasoning|i will now)"
+
+expected_state_delta:
+  # Arrow notation confirms a state change was printed
+  state_change_arrow: "→"
+  # Stress label must appear (desperate miss costs 2)
+  stress_updated: "Stress"

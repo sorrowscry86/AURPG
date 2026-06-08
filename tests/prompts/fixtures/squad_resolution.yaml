@@ -1,0 +1,36 @@
+# Squad resolution — 2d6 pool, weak hit outcome
+# Squad mode: N dice pool, outcome by highest die (6 = strong, 4-5 = weak, 1-3 = miss,
+# two+ 6s = critical). This fixture drives a squad action and verifies squad mechanics.
+id: squad_resolution
+description: >
+  Squad resolution — 2d6 pool action. Verifies the engine selects squad mode,
+  rolls a dice pool, determines outcome by highest die, and outputs correct
+  consequence framing (cost on weak hit, escalation on miss, amplified success on critical).
+
+player_input: >
+  [Squad mode — Mara + Lattice]
+  Lattice and I move in tandem: she jams the signal while I physically
+  disconnect the relay board. Two-person breach, coordinated.
+
+expected_patterns:
+  # Squad mode selected
+  - "(?i)(squad|dice pool|Nd6|pool)"
+  # Outcome tier present (any of the four)
+  - "(?i)(critical|strong hit|weak hit|miss)"
+  # Exactly three numbered options
+  - "(?m)^\\s*1\\)"
+  - "(?m)^\\s*2\\)"
+  - "(?m)^\\s*3\\)"
+  # Freeform invite
+  - "(?i)(or tell me|or what|or describe)"
+
+banned_patterns:
+  # Must not use solo mode formula language for a squad action
+  - "(?i)Action Score"
+  - "(?i)challenge dice"
+  - "(?i)like a physical blow"
+  - "(?i)shivers? down (my|her|his) spine"
+  - "(?i)(let me think|my reasoning|i will now)"
+
+expected_state_delta:
+  state_change_arrow: "→"

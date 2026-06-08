@@ -1,0 +1,41 @@
+# Solo resolution — critical hit (momentum burn cancels both challenge dice)
+# Momentum is currently 6. Burning it should cancel both challenge dice if both are ≤ 6,
+# resolving as a critical. The fixture describes a player who explicitly burns momentum.
+id: solo_critical
+description: >
+  Solo resolution — momentum burn producing a critical outcome. Player burns
+  momentum (current value 6) to cancel challenge dice at or below 6, yielding
+  a critical (equivalent to strong hit with amplified fictional impact).
+
+player_input: >
+  I burn my momentum — cancel both challenge dice — and push the extraction
+  tap deeper into the archive node, ripping the full data packet before the
+  sweep pattern resets.
+
+expected_patterns:
+  # Ledger update present
+  - "\\[SCENE\\]"
+  - "\\[CLOCKS\\]"
+  # Momentum burn acknowledged
+  - "(?i)(momentum (burned|reset|cancelled|canceled)|burn momentum)"
+  # Critical or strong hit outcome
+  - "(?i)(critical|strong hit|momentum (burn|cancel))"
+  # Momentum reset line
+  - "(?i)momentum"
+  # Arrow notation for state changes
+  - "→"
+  # Exactly three numbered options
+  - "(?m)^\\s*1\\)"
+  - "(?m)^\\s*2\\)"
+  - "(?m)^\\s*3\\)"
+
+banned_patterns:
+  # Momentum burn must not leave momentum unchanged
+  - "(?i)momentum.*unchanged"
+  - "(?i)like a physical blow"
+  - "(?i)shivers? down (my|her|his) spine"
+  - "(?i)(let me think|my reasoning|i will now)"
+
+expected_state_delta:
+  # Momentum should reset (represented by an arrow or numeric change)
+  momentum_change: "Momentum"

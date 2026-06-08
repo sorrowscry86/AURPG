@@ -1,0 +1,35 @@
+# Clock advancement — racing clocks completing or nearly completing
+# "Escape to Tramline" (2/6) and "Corporate Lockdown" (3/6) are racing clocks.
+# Player action directly advances one racing clock and threatens the other.
+id: clock_advancement
+description: >
+  Clock advancement scenario — racing clocks. Player action that pushes the
+  escape clock forward, while the lockdown clock also ticks. Verifies engine
+  shows explicit segment fills, uses arrow notation, and narrates the racing
+  tension between the two parallel clocks.
+
+player_input: >
+  I yank the extraction tap and sprint for the service elevator — punching
+  the override code Lattice gave me and riding it down to the tramline level.
+
+expected_patterns:
+  # At least one clock explicitly advanced
+  - "(?i)(clk-race|escape|tramline|lockdown)"
+  # Segment fill notation present for racing clocks
+  - "(?i)(\\d+/6|\\d+→\\d+)"
+  # Arrow notation for state changes
+  - "→"
+  # Exactly three numbered options
+  - "(?m)^\\s*1\\)"
+  - "(?m)^\\s*2\\)"
+  - "(?m)^\\s*3\\)"
+
+banned_patterns:
+  - "(?i)like a physical blow"
+  - "(?i)shivers? down (my|her|his) spine"
+  - "(?i)heart (pounds|hammers|races)"
+  - "(?i)(let me think|my reasoning|i will now)"
+
+expected_state_delta:
+  # Both clocks should be referenced
+  clock_advancement: "→"

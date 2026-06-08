@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Nightly live-LLM regression at 03:00 UTC
+    - cron: "0 3 * * *"
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # PR / offline tier — no API key required
+  # ---------------------------------------------------------------------------
+  offline:
+    name: Offline tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install package and dev deps
+        run: pip install -e ".[dev]"
+
+      - name: Structural tests (XML well-formedness, fixture YAML, regex validity)
+        run: pytest tests/ -m "not live" -v
+
+  # ---------------------------------------------------------------------------
+  # Post-merge / nightly tier — live LLM calls against real Anthropic API
+  # ---------------------------------------------------------------------------
+  live:
+    name: Live LLM evaluation
+    runs-on: ubuntu-latest
+    # Run on pushes to main OR on the nightly schedule; skip for PRs from forks
+    if: |
+      github.event_name == 'schedule' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install package and dev deps
+        run: pip install -e ".[dev]"
+
+      - name: Golden-transcript evaluation (live LLM)
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Use a fast model for CI; override to claude-sonnet-4-6 for deeper eval
+          AURPG_TEST_MODEL: claude-haiku-4-5-20251001
+        run: pytest tests/prompts/ -m live -v --tb=short
