@@ -112,7 +112,7 @@ def _strip_command_tokens(text: str) -> str:
     then strips leading/trailing whitespace from the result.
     """
     result = text
-    for _cmd, pattern in _PATTERNS:
+    for _, pattern in _PATTERNS:
         result = pattern.sub("", result)
     # Collapse multiple spaces left behind by removal
     result = re.sub(r" {2,}", " ", result)
