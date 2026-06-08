@@ -177,6 +177,7 @@ def run_turn(
             model=session.model,
             max_tokens=session.max_tokens,
             recap_threshold=session.recap_threshold,
+            system_prompt_path=session.system_prompt_path,
         )
         return new_session, synthetic_response
 
@@ -208,6 +209,7 @@ def run_turn(
         model=session.model,
         max_tokens=session.max_tokens,
         recap_threshold=session.recap_threshold,
+        system_prompt_path=session.system_prompt_path,
     )
     return new_session, engine_response
 

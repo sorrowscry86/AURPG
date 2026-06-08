@@ -207,6 +207,19 @@ class TestRunTurnNormal:
         # Session state must be unchanged after the exception
         assert len(session.state.turn_history) == original_history_len
 
+    def test_run_turn_preserves_system_prompt_path(self, session, mock_client):
+        eng = _make_engine_response()
+        session_with_path = Session(
+            id=session.id,
+            state=session.state,
+            system_prompt=session.system_prompt,
+            model=session.model,
+            system_prompt_path="/some/path/prompt.xml",
+        )
+        with patch("aurpg.session.call_engine_with_retry", return_value=eng):
+            new_sess, _ = run_turn(session_with_path, "I move.", client=mock_client)
+        assert new_sess.system_prompt_path == "/some/path/prompt.xml"
+
 
 # ---------------------------------------------------------------------------
 # run_turn — safety command path
@@ -266,6 +279,18 @@ class TestRunTurnSafety:
     def test_safety_response_output_tokens_zero(self, session, mock_client):
         _, response = run_turn(session, "[X-Card]", client=mock_client)
         assert response.output_tokens == 0
+
+    def test_run_turn_safety_preserves_system_prompt_path(self):
+        base = new_session(SAMPLE_STATE_XML, SAMPLE_SYSTEM_PROMPT, model=TEST_MODEL)
+        session_with_path = Session(
+            id=base.id,
+            state=base.state,
+            system_prompt=base.system_prompt,
+            model=base.model,
+            system_prompt_path="/some/path/prompt.xml",
+        )
+        new_sess, _ = run_turn(session_with_path, "[X-Card]", client=MagicMock())
+        assert new_sess.system_prompt_path == "/some/path/prompt.xml"
 
 
 # ---------------------------------------------------------------------------
