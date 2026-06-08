@@ -331,6 +331,7 @@ class TestSaveState:
             clocks=state.clocks,
             progress_tracks=state.progress_tracks,
             safety_profile=state.safety_profile,
+            resources=state.resources,
             turn_history=state.turn_history,
         )
         returned = save_state(state)
@@ -472,3 +473,45 @@ def test_save_roundtrip_preserves_resources(tmp_path):
     reloaded = load_state(out)
     assert reloaded.resources["attributes"] == state.resources["attributes"]
     assert reloaded.resources["inventory"] == state.resources["inventory"]
+
+
+def test_save_roundtrip_wizard_state(tmp_path):
+    from aurpg.wizard import WizardConfig, config_to_state_xml
+
+    cfg = WizardConfig(
+        title="Test",
+        genre="fantasy",
+        tone="grim",
+        canon_mode="flexible_canon",
+        character_name="Hero",
+        edge=2,
+        heart=2,
+        iron=2,
+        shadow=2,
+        wits=2,
+        load="normal",
+        safety={
+            "horror": "green",
+            "health": "green",
+            "relationships": "green",
+            "social_issues": "green",
+        },
+        orchestration_mode="collaborative_consult",
+        initial_position="risky",
+        initial_effect="standard",
+    )
+    xml = config_to_state_xml(cfg)
+    init_path = tmp_path / "init.xml"
+    init_path.write_text(xml, encoding="utf-8")
+
+    state = load_state(init_path)
+    assert len(state.resources["attributes"]) == 5
+    assert state.resources["bonuses"] == []
+    assert state.resources["relationships"] == []
+    assert state.resources["inventory"] == []
+
+    out = tmp_path / "out.xml"
+    save_state(state, out)
+    reloaded = load_state(out)
+    assert reloaded.resources["attributes"] == state.resources["attributes"]
+    assert reloaded.resources["bonuses"] == []

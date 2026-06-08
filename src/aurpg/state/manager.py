@@ -405,6 +405,9 @@ def state_to_xml(state: CampaignState) -> str:
 def save_state(state: CampaignState, path: Path | None = None) -> Path:
     """Serialise *state* back to XML and write it to disk.
 
+    Delegates to :func:`state_to_xml` for serialisation so there is a single
+    source of truth for the XML structure.
+
     Args:
         state: Campaign state to serialise.
         path:  Destination path.  Defaults to ``state.path`` when ``None``.
@@ -413,18 +416,6 @@ def save_state(state: CampaignState, path: Path | None = None) -> Path:
         The path that was written.
     """
     target = path if path is not None else state.path
-
-    root = Element("aurpg_campaign_state")
-    root.set("version", "0.1-prototype")
-
-    root.append(_build_session_state_elem(state.session_state))
-    root.append(_build_resources_elem(state.resources))
-    root.append(_build_state_machines_elem(state.clocks, state.progress_tracks))
-    root.append(_build_safety_profile_elem(state.safety_profile))
-
-    tree = ET.ElementTree(root)
-    ET.indent(tree, space="  ")
     target.parent.mkdir(parents=True, exist_ok=True)
-    tree.write(str(target), encoding="unicode", xml_declaration=False)
-
+    target.write_text(state_to_xml(state), encoding="utf-8")
     return target
