@@ -39,8 +39,14 @@ class CampaignState:
     decoupled from the typed dataclasses in ``aurpg.state``.  Typed access is
     provided by the higher-level session layer.
 
-    Note: ``<resources>`` (attributes, bonuses, relationships, inventory) is not
-    stored in this dataclass and is therefore not serialized by ``save_state``.
+    Attributes:
+        path:            source file path (used as default save target)
+        session_state:   nested dict mirroring the <session_state> element
+        clocks:          list of attribute dicts, one per <clock>
+        progress_tracks: list of attribute dicts, one per <track>
+        safety_profile:  list of attribute dicts, one per <content_category>
+        resources:       dict with keys attributes, bonuses, relationships, inventory
+        turn_history:    append-only mutation log
     """
 
     path: Path                    # source file path (used as default save target)
@@ -48,6 +54,7 @@ class CampaignState:
     clocks: list[dict]            # list of attribute dicts, one per <clock>
     progress_tracks: list[dict]   # list of attribute dicts, one per <track>
     safety_profile: list[dict]    # list of attribute dicts, one per <content_category>
+    resources: dict = field(default_factory=dict)           # attributes, bonuses, relationships, inventory
     turn_history: list[dict] = field(default_factory=list)  # append-only mutation log
 
 
@@ -104,6 +111,30 @@ def _parse_safety_profile(root: Element) -> list[dict]:
     return categories
 
 
+def _parse_resources(root: Element) -> dict:
+    result: dict = {"attributes": [], "bonuses": [], "relationships": [], "inventory": []}
+    res_elem = root.find("resources")
+    if res_elem is None:
+        return result
+    attrs_elem = res_elem.find("attributes")
+    if attrs_elem is not None:
+        for attr in attrs_elem.findall("attribute"):
+            result["attributes"].append(_elem_to_dict(attr))
+    bonuses_elem = res_elem.find("bonuses")
+    if bonuses_elem is not None:
+        for bonus in bonuses_elem.findall("bonus"):
+            result["bonuses"].append(_elem_to_dict(bonus))
+    rels_elem = res_elem.find("relationships")
+    if rels_elem is not None:
+        for rel in rels_elem.findall("relationship"):
+            result["relationships"].append(_elem_to_dict(rel))
+    inv_elem = res_elem.find("inventory")
+    if inv_elem is not None:
+        for item in inv_elem.findall("item"):
+            result["inventory"].append(_elem_to_dict(item))
+    return result
+
+
 # ---------------------------------------------------------------------------
 # Load
 # ---------------------------------------------------------------------------
@@ -147,6 +178,7 @@ def load_state(path: Path) -> CampaignState:
         clocks=_parse_clocks(root),
         progress_tracks=_parse_tracks(root),
         safety_profile=_parse_safety_profile(root),
+        resources=_parse_resources(root),
         turn_history=[],
     )
 
@@ -164,6 +196,7 @@ def _copy_state(state: CampaignState) -> CampaignState:
         clocks=copy.deepcopy(state.clocks),
         progress_tracks=copy.deepcopy(state.progress_tracks),
         safety_profile=copy.deepcopy(state.safety_profile),
+        resources=copy.deepcopy(state.resources),
         turn_history=copy.deepcopy(state.turn_history),
     )
 
@@ -328,6 +361,31 @@ def _build_safety_profile_elem(safety_profile: list[dict]) -> Element:
     return profile_elem
 
 
+def _build_resources_elem(resources: dict) -> Element:
+    res_elem = Element("resources")
+    attrs_elem = SubElement(res_elem, "attributes")
+    for a in resources.get("attributes", []):
+        el = SubElement(attrs_elem, "attribute")
+        for k, v in a.items():
+            el.set(k, str(v))
+    bonuses_elem = SubElement(res_elem, "bonuses")
+    for b in resources.get("bonuses", []):
+        el = SubElement(bonuses_elem, "bonus")
+        for k, v in b.items():
+            el.set(k, str(v))
+    rels_elem = SubElement(res_elem, "relationships")
+    for r in resources.get("relationships", []):
+        el = SubElement(rels_elem, "relationship")
+        for k, v in r.items():
+            el.set(k, str(v))
+    inv_elem = SubElement(res_elem, "inventory")
+    for i in resources.get("inventory", []):
+        el = SubElement(inv_elem, "item")
+        for k, v in i.items():
+            el.set(k, str(v))
+    return res_elem
+
+
 # ---------------------------------------------------------------------------
 # Persistence
 # ---------------------------------------------------------------------------
@@ -337,6 +395,7 @@ def state_to_xml(state: CampaignState) -> str:
     """Serialise *state* to an XML string without writing to disk."""
     root = ET.Element("aurpg_campaign_state", version="0.1-prototype")
     root.append(_build_session_state_elem(state.session_state))
+    root.append(_build_resources_elem(state.resources))
     root.append(_build_state_machines_elem(state.clocks, state.progress_tracks))
     root.append(_build_safety_profile_elem(state.safety_profile))
     ET.indent(root, space="  ")
@@ -359,10 +418,9 @@ def save_state(state: CampaignState, path: Path | None = None) -> Path:
     root.set("version", "0.1-prototype")
 
     root.append(_build_session_state_elem(state.session_state))
+    root.append(_build_resources_elem(state.resources))
     root.append(_build_state_machines_elem(state.clocks, state.progress_tracks))
     root.append(_build_safety_profile_elem(state.safety_profile))
-    # TODO: <resources> (attributes, bonuses, relationships, inventory) is not held in
-    #       CampaignState and is therefore silently dropped on save.  Tracked for Phase 3.
 
     tree = ET.ElementTree(root)
     ET.indent(tree, space="  ")

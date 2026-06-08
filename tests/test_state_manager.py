@@ -73,6 +73,23 @@ class TestLoadState:
         state = load_state(SAMPLE_XML)
         assert state.turn_history == []
 
+    def test_load_populates_resources(self):
+        state = load_state(SAMPLE_XML)
+        assert "attributes" in state.resources
+        assert isinstance(state.resources["attributes"], list)
+        assert len(state.resources["attributes"]) == 5
+
+    def test_load_resources_attribute_values(self):
+        state = load_state(SAMPLE_XML)
+        edge = next(a for a in state.resources["attributes"] if a["name"] == "edge")
+        assert edge["value"] == "3"
+
+    def test_load_resources_inventory(self):
+        state = load_state(SAMPLE_XML)
+        items = state.resources.get("inventory", [])
+        names = [i["name"] for i in items]
+        assert "signal_scrambler" in names
+
     def test_load_invalid_xml_raises_state_error(self, tmp_path: Path):
         bad_xml = tmp_path / "bad.xml"
         bad_xml.write_text("<not_valid_aurpg />")
@@ -441,3 +458,17 @@ class TestRewind:
         state = append_turn(state, {"n": 1})
         rewound = rewind(state, steps=0)
         assert len(rewound.turn_history) == 1
+
+
+# ---------------------------------------------------------------------------
+# resources round-trip
+# ---------------------------------------------------------------------------
+
+
+def test_save_roundtrip_preserves_resources(tmp_path):
+    state = load_state(SAMPLE_XML)
+    out = tmp_path / "state.xml"
+    save_state(state, out)
+    reloaded = load_state(out)
+    assert reloaded.resources["attributes"] == state.resources["attributes"]
+    assert reloaded.resources["inventory"] == state.resources["inventory"]
