@@ -20,7 +20,7 @@
       deep_pov="true"
       stress="4"
       momentum="6"
-      harm="bruised_ribs"
+      harm="bruised"
       load="normal"
     />
     <resolution_state
