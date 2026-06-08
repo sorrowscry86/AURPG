@@ -21,6 +21,7 @@ from aurpg.session import (
     new_session,
     run_turn,
     save_session,
+    summarize_recap,
 )
 
 # ---------------------------------------------------------------------------
@@ -636,3 +637,59 @@ class TestSaveLoadPersistence:
         turns_file = tmp_path / session.id / "turns.jsonl"
         assert turns_file.exists()
         assert turns_file.read_text(encoding="utf-8") == ""
+
+
+# ---------------------------------------------------------------------------
+# TestSummarizeRecap
+# ---------------------------------------------------------------------------
+
+
+class TestSummarizeRecap:
+    def test_summarize_recap_calls_llm_once(self):
+        import copy as _copy
+        base = new_session(SAMPLE_STATE_XML, SAMPLE_SYSTEM_PROMPT, model=TEST_MODEL)
+        state = _copy.deepcopy(base.state)
+        for i in range(3):
+            state.turn_history.append({"player_input": f"turn {i}", "raw_response": f"resp {i}"})
+        session = Session(
+            id=base.id, state=state, system_prompt=base.system_prompt, model=base.model
+        )
+        mock_client = MagicMock()
+        mock_msg = MagicMock()
+        mock_msg.content = [MagicMock(text="A brave hero fought goblins.")]
+        mock_client.messages.create.return_value = mock_msg
+
+        result = summarize_recap(session, client=mock_client)
+
+        mock_client.messages.create.assert_called_once()
+        assert "brave hero" in result
+
+    def test_summarize_recap_empty_history_returns_empty(self):
+        session = new_session(SAMPLE_STATE_XML, SAMPLE_SYSTEM_PROMPT, model=TEST_MODEL)
+        mock_client = MagicMock()
+        result = summarize_recap(session, client=mock_client)
+        assert result == ""
+        mock_client.messages.create.assert_not_called()
+
+    def test_summarize_recap_uses_session_model(self):
+        import copy as _copy
+        base = new_session(SAMPLE_STATE_XML, SAMPLE_SYSTEM_PROMPT, model="claude-haiku-4-5-20251001")
+        state = _copy.deepcopy(base.state)
+        state.turn_history.append({"player_input": "x", "raw_response": "y"})
+        session = Session(
+            id=base.id, state=state, system_prompt=base.system_prompt, model="claude-haiku-4-5-20251001"
+        )
+        mock_client = MagicMock()
+        mock_msg = MagicMock()
+        mock_msg.content = [MagicMock(text="Summary text.")]
+        mock_client.messages.create.return_value = mock_msg
+
+        summarize_recap(session, client=mock_client)
+
+        call_kwargs = mock_client.messages.create.call_args
+        model_used = (
+            call_kwargs.kwargs.get("model")
+            if call_kwargs.kwargs.get("model")
+            else (call_kwargs.args[0] if call_kwargs.args else None)
+        )
+        assert model_used == "claude-haiku-4-5-20251001"

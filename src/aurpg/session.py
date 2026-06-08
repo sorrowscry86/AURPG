@@ -46,10 +46,20 @@ __all__ = [
     "new_session",
     "run_turn",
     "save_session",
+    "summarize_recap",
 ]
 
 # Maximum number of recent turns included in a recap context block.
 _RECAP_WINDOW: int = 5
+
+_RECAP_SUMMARY_SYSTEM = (
+    "You are a concise narrative summarizer for a tabletop RPG session. "
+    "Given a sequence of turns, produce a 2-4 sentence plain-English summary "
+    "of what happened. Focus on story beats: actions taken, outcomes, and "
+    "any safety events. Output only the summary — no preamble."
+)
+
+_RECAP_SUMMARY_MAX_TOKENS = 256
 
 
 # ---------------------------------------------------------------------------
@@ -373,3 +383,37 @@ def build_recap_context(session: Session) -> str:
     if not recent:
         return ""
     return "\n".join(json.dumps(turn) for turn in recent)
+
+
+def summarize_recap(session: Session, *, client) -> str:
+    """Return an LLM-generated plain-text summary of the session's turn history.
+
+    Returns empty string immediately when there is no turn history (no API call
+    is made).  Makes a single, lightweight API call capped at 256 tokens.
+
+    Args:
+        session: The current session.
+        client:  An anthropic.Anthropic client instance.
+
+    Returns:
+        A 2-4 sentence narrative summary, or ``""`` if history is empty.
+    """
+    if not session.state.turn_history:
+        return ""
+
+    turns_text = "\n".join(
+        f"Turn {i + 1}: Player said: {t.get('player_input', '')}. "
+        f"Engine responded: {t.get('raw_response', '')[:200]}"
+        for i, t in enumerate(session.state.turn_history)
+    )
+    prompt = f"Summarize the following RPG session turns:\n\n{turns_text}"
+
+    response = client.messages.create(
+        model=session.model,
+        max_tokens=_RECAP_SUMMARY_MAX_TOKENS,
+        system=_RECAP_SUMMARY_SYSTEM,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    return "".join(
+        block.text for block in response.content if hasattr(block, "text")
+    ).strip()
