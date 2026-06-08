@@ -10,8 +10,6 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from aurpg.dice import ActionRoll, SquadRoll, make_rng, roll_action, roll_squad
 from aurpg.llm import EngineResponse
 from aurpg.session import (
@@ -67,10 +65,6 @@ _FAKE_RESPONSE = EngineResponse(
 )
 
 
-def _fake_engine(*args, **kwargs) -> EngineResponse:
-    return _FAKE_RESPONSE
-
-
 def _write_state(tmp_path: Path) -> Path:
     """Write a minimal campaign state XML to tmp_path and return the path."""
     xml = config_to_state_xml(_MINIMAL_CONFIG)
@@ -109,7 +103,7 @@ def test_ten_turn_session_with_mocked_llm(tmp_path: Path) -> None:
     session = new_session(state_path, _SYSTEM_PROMPT_PATH, model=_TEST_MODEL)
     mock_client = MagicMock()
 
-    with patch("aurpg.session.call_engine_with_retry", side_effect=_fake_engine):
+    with patch("aurpg.session.call_engine_with_retry", return_value=_FAKE_RESPONSE):
         for i in range(10):
             session, _ = run_turn(session, f"action {i}", client=mock_client)
 
@@ -140,7 +134,7 @@ def test_save_and_resume(tmp_path: Path) -> None:
     session = new_session(state_path, _SYSTEM_PROMPT_PATH, model=_TEST_MODEL)
     mock_client = MagicMock()
 
-    with patch("aurpg.session.call_engine_with_retry", side_effect=_fake_engine):
+    with patch("aurpg.session.call_engine_with_retry", return_value=_FAKE_RESPONSE):
         for i in range(5):
             session, _ = run_turn(session, f"action {i}", client=mock_client)
 
@@ -158,7 +152,7 @@ def test_save_and_resume(tmp_path: Path) -> None:
     # turn_history is runtime-only; the loaded session starts empty
     assert loaded_session.state.turn_history == []
 
-    with patch("aurpg.session.call_engine_with_retry", side_effect=_fake_engine):
+    with patch("aurpg.session.call_engine_with_retry", return_value=_FAKE_RESPONSE):
         for i in range(5):
             loaded_session, _ = run_turn(loaded_session, f"resumed action {i}", client=mock_client)
 
@@ -175,10 +169,10 @@ def test_safety_interrupt_stops_llm(tmp_path: Path) -> None:
     session = new_session(state_path, _SYSTEM_PROMPT_PATH, model=_TEST_MODEL)
     mock_client = MagicMock()
 
-    def _should_not_be_called(*args, **kwargs):
-        raise AssertionError("call_engine_with_retry must not be called for safety commands")
-
-    with patch("aurpg.session.call_engine_with_retry", side_effect=_should_not_be_called):
+    with patch(
+        "aurpg.session.call_engine_with_retry",
+        side_effect=AssertionError("call_engine_with_retry must not be called for safety commands"),
+    ):
         new_sess, response = run_turn(session, "[X-Card] I need to stop", client=mock_client)
 
     assert response.raw_text.startswith("[OOC — Safety]")
@@ -204,13 +198,13 @@ def test_needs_recap_threshold(tmp_path: Path) -> None:
         recap_threshold=3,
     )
 
-    with patch("aurpg.session.call_engine_with_retry", side_effect=_fake_engine):
+    with patch("aurpg.session.call_engine_with_retry", return_value=_FAKE_RESPONSE):
         session, _ = run_turn(session, "turn 1", client=mock_client)
         session, _ = run_turn(session, "turn 2", client=mock_client)
 
     assert not needs_recap(session)
 
-    with patch("aurpg.session.call_engine_with_retry", side_effect=_fake_engine):
+    with patch("aurpg.session.call_engine_with_retry", return_value=_FAKE_RESPONSE):
         session, _ = run_turn(session, "turn 3", client=mock_client)
 
     assert needs_recap(session)
@@ -231,7 +225,7 @@ def test_rewind_removes_turns(tmp_path: Path) -> None:
     session = new_session(state_path, _SYSTEM_PROMPT_PATH, model=_TEST_MODEL)
     mock_client = MagicMock()
 
-    with patch("aurpg.session.call_engine_with_retry", side_effect=_fake_engine):
+    with patch("aurpg.session.call_engine_with_retry", return_value=_FAKE_RESPONSE):
         for i in range(3):
             session, _ = run_turn(session, f"action {i}", client=mock_client)
 
