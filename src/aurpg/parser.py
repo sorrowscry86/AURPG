@@ -153,6 +153,15 @@ def _attr(elem: Element, name: str) -> str:
     return val
 
 
+def _bool_attr(elem: Element, name: str) -> bool:
+    val = _attr(elem, name).lower()
+    if val == "true":
+        return True
+    if val == "false":
+        return False
+    raise ValueError(f"<{elem.tag}> attribute '{name}' must be 'true' or 'false', got '{val}'")
+
+
 def _parse_root(root: Element) -> SessionState:
     session_elem = _require(root, "session_state")
     resources_elem = root.find("resources")
@@ -195,7 +204,7 @@ def _parse_play_state(elem: Element) -> PlayState:
 def _parse_player_state(elem: Element) -> PlayerState:
     return PlayerState(
         character_name=_attr(elem, "character_name"),
-        deep_pov=_attr(elem, "deep_pov").lower() == "true",
+        deep_pov=_bool_attr(elem, "deep_pov"),
         stress=int(_attr(elem, "stress")),
         momentum=int(_attr(elem, "momentum")),
         harm=HarmLevel(_attr(elem, "harm")),
@@ -214,8 +223,8 @@ def _parse_resolution_state(elem: Element) -> ResolutionState:
 
 def _parse_safety_state(elem: Element) -> SafetyState:
     return SafetyState(
-        hard_stop=_attr(elem, "hard_stop").lower() == "true",
-        pause=_attr(elem, "pause").lower() == "true",
+        hard_stop=_bool_attr(elem, "hard_stop"),
+        pause=_bool_attr(elem, "pause"),
         intensity_check=_attr(elem, "intensity_check"),
     )
 
@@ -227,8 +236,11 @@ def _parse_resources(elem: Element) -> Resources:
     if attrs_elem is not None:
         for a in attrs_elem.findall("attribute"):
             name = _attr(a, "name")
-            if name in CANONICAL_ATTRIBUTES:
-                resources.attributes.append(Attribute(name=name, value=int(_attr(a, "value"))))
+            if name not in CANONICAL_ATTRIBUTES:
+                raise ValueError(
+                    f"Invalid attribute name '{name}', must be one of {CANONICAL_ATTRIBUTES}"
+                )
+            resources.attributes.append(Attribute(name=name, value=int(_attr(a, "value"))))
 
     bonuses_elem = elem.find("bonuses")
     if bonuses_elem is not None:

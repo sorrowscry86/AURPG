@@ -164,6 +164,24 @@ def test_parse_state_invalid_enum_raises():
         parse_state(bad)
 
 
+def test_parse_state_invalid_bool_raises():
+    bad = _MINIMAL_XML.replace('deep_pov="true"', 'deep_pov="invalid"')
+    with pytest.raises(ValueError, match="must be 'true' or 'false'"):
+        parse_state(bad)
+
+
+def test_parse_state_invalid_attribute_name_raises():
+    bad = _MINIMAL_XML.replace(
+        "</session_state>",
+        "</session_state>"
+        "<resources><attributes>"
+        '<attribute name="invalid_attr" value="3"/>'
+        "</attributes></resources>",
+    )
+    with pytest.raises(ValueError, match="Invalid attribute name"):
+        parse_state(bad)
+
+
 # ---------------------------------------------------------------------------
 # Round-trip: load → dump → parse produces equal state
 # ---------------------------------------------------------------------------
