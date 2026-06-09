@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import importlib.resources
 import json
+import os
 import tempfile
 from pathlib import Path
 
@@ -66,10 +67,13 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Path to system prompt XML (default: bundled aurpg_system_prompt_prototype.xml)",
     )
+    _default_model = (
+        "openrouter/auto" if os.environ.get("OPENROUTER_API_KEY") else "claude-haiku-4-5-20251001"
+    )
     parser.add_argument(
         "--model",
-        default="claude-haiku-4-5-20251001",
-        help="Anthropic model ID",
+        default=_default_model,
+        help="Model ID (default: openrouter/auto when OPENROUTER_API_KEY is set, else claude-haiku-4-5-20251001)",
     )
 
     subparsers = parser.add_subparsers(dest="command")
