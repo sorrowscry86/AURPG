@@ -50,3 +50,11 @@ npm-debug.log*
 
 # Distribution / packaging
 *.whl
+
+# LLM context export artifacts
+AURPG-output.md
+AURPG-output.txt
+
+# Tool internals
+.specstory/
+docs/superpowers/

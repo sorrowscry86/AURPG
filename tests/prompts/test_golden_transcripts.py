@@ -88,6 +88,11 @@ def _check_state_delta(response: str, fixture: dict) -> list[str]:
                 failures.append(
                     f"MISSING state delta {key!r}: expected substring {value!r} in response"
                 )
+        elif isinstance(value, bool | int):
+            if not _semantic_state_delta_present(response, key, value):
+                failures.append(
+                    f"MISSING state delta {key!r}: expected semantic value {value!r}"
+                )
         else:
             warnings.warn(
                 f"State delta check '{key}={value}' requires semantic parsing "
@@ -96,6 +101,84 @@ def _check_state_delta(response: str, fixture: dict) -> list[str]:
                 stacklevel=2,
             )
     return failures
+
+
+def _semantic_state_delta_present(response: str, key: str, expected: bool | int) -> bool:
+    """Return true when response contains structured evidence for a state value."""
+    field_name = key.rsplit(".", maxsplit=1)[-1]
+
+    if isinstance(expected, bool):
+        expected_text = str(expected).lower()
+        return bool(
+            re.search(
+                rf"\b{re.escape(field_name)}\b\s*[:=]\s*{expected_text}\b",
+                response,
+                re.IGNORECASE,
+            )
+        )
+
+    ledger_label_by_field = {
+        "stress": "STRESS",
+        "momentum": "MOMENTUM",
+    }
+    ledger_label = ledger_label_by_field.get(field_name, field_name.upper())
+    arrow = r"(?:->|â†’)"
+    current_value = re.escape(str(expected))
+    return bool(
+        re.search(
+            rf"\[{re.escape(ledger_label)}\]\s*(?:-?\d+\s*{arrow}\s*)?{current_value}\b",
+            response,
+            re.IGNORECASE,
+        )
+    )
+
+
+def test_state_delta_accepts_boolean_ledger_values_without_warning() -> None:
+    """Boolean state deltas should be validated instead of skipped."""
+    fixture = {"expected_state_delta": {"safety_state.pause": True}}
+    response = "[SAFETY] pause=true | hard_stop=false"
+
+    with warnings.catch_warnings(record=True) as caught:
+        failures = _check_state_delta(response, fixture)
+
+    assert failures == []
+    assert caught == []
+
+
+def test_state_delta_reports_missing_boolean_value() -> None:
+    """A mismatched boolean state delta should produce a failure."""
+    fixture = {"expected_state_delta": {"safety_state.pause": True}}
+    response = "[SAFETY] pause=false | hard_stop=false"
+
+    failures = _check_state_delta(response, fixture)
+
+    assert failures == [
+        "MISSING state delta 'safety_state.pause': expected semantic value True"
+    ]
+
+
+def test_state_delta_accepts_numeric_ledger_updates_without_warning() -> None:
+    """Numeric state deltas should match current ledger values after arrows."""
+    fixture = {"expected_state_delta": {"player_state.stress": 6}}
+    response = "[STRESS] 4->6/10 | [MOMENTUM] 6 | [HARM] none"
+
+    with warnings.catch_warnings(record=True) as caught:
+        failures = _check_state_delta(response, fixture)
+
+    assert failures == []
+    assert caught == []
+
+
+def test_state_delta_reports_missing_numeric_value() -> None:
+    """Numeric state deltas should fail when the response shows a different value."""
+    fixture = {"expected_state_delta": {"player_state.stress": 6}}
+    response = "[STRESS] 4->5/10 | [MOMENTUM] 6 | [HARM] none"
+
+    failures = _check_state_delta(response, fixture)
+
+    assert failures == [
+        "MISSING state delta 'player_state.stress': expected semantic value 6"
+    ]
 
 
 @pytest.mark.live
