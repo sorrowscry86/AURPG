@@ -5,12 +5,17 @@ retry logic, and a client factory.  The Anthropic API is only called from
 :func:`call_engine`; all other functions are pure or delegate to that entry
 point.
 
+When ``OPENROUTER_API_KEY`` is present in the environment, :func:`make_client`
+returns an :class:`_OpenRouterClient` instead of an :class:`anthropic.Anthropic`
+instance.  The wrapper exposes the same ``.messages.create`` interface so no
+other code needs to change.
+
 Typical usage::
 
-    client = make_client()                          # reads ANTHROPIC_API_KEY
+    client = make_client()                          # reads ANTHROPIC_API_KEY or OPENROUTER_API_KEY
     messages = assemble_prompt(state_xml, player_input)
     result = call_engine_with_retry(
-        messages, system_xml, client=client, model="claude-sonnet-4-5"
+        messages, system_xml, client=client, model="claude-haiku-4-5-20251001"
     )
     print(result.raw_text)
     print(result.options)
@@ -18,9 +23,11 @@ Typical usage::
 
 from __future__ import annotations
 
+import os
 import re
 import time
 from dataclasses import dataclass
+from typing import Any
 
 import anthropic
 
@@ -71,6 +78,95 @@ class EngineResponse:
 
 
 # ---------------------------------------------------------------------------
+# OpenRouter shim — makes openai.OpenAI quack like anthropic.Anthropic
+# ---------------------------------------------------------------------------
+
+
+class _TextBlock:
+    """Minimal stand-in for anthropic.types.TextBlock."""
+
+    __slots__ = ("text",)
+
+    def __init__(self, text: str) -> None:
+        self.text = text
+
+
+class _TokenUsage:
+    __slots__ = ("input_tokens", "output_tokens")
+
+    def __init__(self, input_tokens: int, output_tokens: int) -> None:
+        self.input_tokens = input_tokens
+        self.output_tokens = output_tokens
+
+
+class _OpenRouterResponse:
+    """Wraps an OpenAI ChatCompletion and exposes the Anthropic response interface."""
+
+    def __init__(self, raw: Any) -> None:
+        text = raw.choices[0].message.content or ""
+        self.content = [_TextBlock(text)]
+        usage = raw.usage
+        self.usage = _TokenUsage(
+            input_tokens=getattr(usage, "prompt_tokens", 0) or 0,
+            output_tokens=getattr(usage, "completion_tokens", 0) or 0,
+        )
+
+
+class _OpenRouterMessages:
+    def __init__(self, openai_client: Any) -> None:
+        self._client = openai_client
+
+    def create(
+        self,
+        *,
+        model: str,
+        max_tokens: int,
+        system: str,
+        messages: list[dict],
+    ) -> _OpenRouterResponse:
+        # OpenRouter model IDs: prefix with "anthropic/" when no provider slug present
+        or_model = model if "/" in model else f"anthropic/{model}"
+        openai_messages = [{"role": "system", "content": system}] + messages
+        response = self._client.chat.completions.create(
+            model=or_model,
+            max_tokens=max_tokens,
+            messages=openai_messages,
+        )
+        return _OpenRouterResponse(response)
+
+
+class _OpenRouterClient:
+    """Thin wrapper making ``openai.OpenAI`` + OpenRouter quack like ``anthropic.Anthropic``."""
+
+    def __init__(self, api_key: str) -> None:
+        try:
+            from openai import OpenAI
+        except ImportError as exc:
+            raise ImportError(
+                "openai package required for OpenRouter support: pip install openai"
+            ) from exc
+        self.messages = _OpenRouterMessages(
+            OpenAI(
+                api_key=api_key,
+                base_url="https://openrouter.ai/api/v1",
+            )
+        )
+
+
+# ---------------------------------------------------------------------------
+# Retryable error types — covers both Anthropic and OpenRouter (OpenAI)
+# ---------------------------------------------------------------------------
+
+_RETRYABLE_ERRORS: tuple[type[Exception], ...] = (anthropic.APIStatusError,)
+try:
+    import openai as _openai_mod
+
+    _RETRYABLE_ERRORS = _RETRYABLE_ERRORS + (_openai_mod.APIStatusError,)
+except ImportError:
+    pass
+
+
+# ---------------------------------------------------------------------------
 # Prompt assembly
 # ---------------------------------------------------------------------------
 
@@ -79,7 +175,7 @@ def assemble_prompt(
     campaign_state_xml: str,
     player_input: str,
 ) -> list[dict]:
-    """Build the ``messages`` list for the Anthropic API call.
+    """Build the ``messages`` list for the API call.
 
     The campaign state is wrapped in ``<current_campaign_state>`` tags and
     merged with the player input into a single user message.  The system
@@ -94,7 +190,7 @@ def assemble_prompt(
         A one-element list containing a single ``{"role": "user", "content": "..."}``
         dict suitable for passing directly to ``client.messages.create(messages=...)``.
         State and player input are merged into one message to satisfy the
-        Anthropic API requirement that consecutive messages must alternate roles.
+        API requirement that consecutive messages must alternate roles.
     """
     content = (
         "<current_campaign_state>\n"
@@ -130,17 +226,20 @@ def call_engine(
     messages: list[dict],
     system: str,
     *,
-    client: anthropic.Anthropic,
+    client: anthropic.Anthropic | _OpenRouterClient,
     model: str,
     max_tokens: int = 1024,
 ) -> EngineResponse:
-    """Invoke the Anthropic API once and return a structured :class:`EngineResponse`.
+    """Invoke the API once and return a structured :class:`EngineResponse`.
+
+    Works with both an :class:`anthropic.Anthropic` client and an
+    :class:`_OpenRouterClient` wrapper.
 
     Args:
         messages:   The messages list from :func:`assemble_prompt`.
         system:     The system prompt string passed as the ``system`` parameter.
-        client:     An :class:`anthropic.Anthropic` instance.
-        model:      Model identifier string (e.g. ``"claude-sonnet-4-5"``).
+        client:     An Anthropic or OpenRouter client instance.
+        model:      Model identifier string (e.g. ``"claude-haiku-4-5-20251001"``).
         max_tokens: Maximum tokens to generate (default 1024).
 
     Returns:
@@ -180,24 +279,24 @@ def call_engine_with_retry(
     messages: list[dict],
     system: str,
     *,
-    client: anthropic.Anthropic,
+    client: anthropic.Anthropic | _OpenRouterClient,
     model: str,
     max_tokens: int = 1024,
     max_retries: int = 3,
 ) -> EngineResponse:
     """Call the engine with exponential-backoff retry on rate-limit errors.
 
-    Retries on :class:`anthropic.APIStatusError` (status 429 / 529) up to
+    Retries on :class:`anthropic.APIStatusError` (status 429 / 529) and
+    ``openai.APIStatusError`` (when using the OpenRouter client) up to
     *max_retries* attempts.  The wait between attempts follows ``2^attempt``
     seconds: 1 s, 2 s, 4 s, …
 
-    Non-:class:`anthropic.APIStatusError` exceptions are re-raised immediately
-    without retrying.
+    Non-retryable exceptions are re-raised immediately without retrying.
 
     Args:
         messages:    The messages list from :func:`assemble_prompt`.
         system:      The system prompt string.
-        client:      An :class:`anthropic.Anthropic` instance.
+        client:      An Anthropic or OpenRouter client instance.
         model:       Model identifier string.
         max_tokens:  Maximum tokens to generate (default 1024).
         max_retries: Total number of attempts (default 3).  Must be ≥ 1.
@@ -206,26 +305,25 @@ def call_engine_with_retry(
         :class:`EngineResponse` from the first successful attempt.
 
     Raises:
-        anthropic.APIStatusError: After all *max_retries* attempts fail.
-        Any other exception:      Immediately, without retrying.
+        anthropic.APIStatusError or openai.APIStatusError: After all retries fail.
+        Any other exception: Immediately, without retrying.
     """
     if max_retries < 1:
         raise ValueError("max_retries must be >= 1")
 
-    last_error: anthropic.APIStatusError | None = None
+    last_error: Exception | None = None
 
     for attempt in range(max_retries):
         try:
             return call_engine(
                 messages, system, client=client, model=model, max_tokens=max_tokens
             )
-        except anthropic.APIStatusError as exc:
+        except _RETRYABLE_ERRORS as exc:
             last_error = exc
             if attempt < max_retries - 1:
                 wait_seconds = 2**attempt  # 1, 2, 4, …
                 time.sleep(wait_seconds)
 
-    # All attempts exhausted
     raise last_error  # type: ignore[misc]
 
 
@@ -234,16 +332,27 @@ def call_engine_with_retry(
 # ---------------------------------------------------------------------------
 
 
-def make_client(api_key: str | None = None) -> anthropic.Anthropic:
-    """Create and return an :class:`anthropic.Anthropic` client.
+def make_client(api_key: str | None = None) -> anthropic.Anthropic | _OpenRouterClient:
+    """Create and return an API client.
+
+    Priority order:
+    1. If *api_key* is provided, always return an :class:`anthropic.Anthropic` client
+       using that key.
+    2. If ``OPENROUTER_API_KEY`` is set in the environment, return an
+       :class:`_OpenRouterClient` (requires ``openai`` package installed).
+    3. Otherwise return an :class:`anthropic.Anthropic` client that reads
+       ``ANTHROPIC_API_KEY`` from the environment automatically.
 
     Args:
-        api_key: API key to use.  If ``None``, the SDK reads the
-                 ``ANTHROPIC_API_KEY`` environment variable automatically.
+        api_key: Explicit Anthropic API key.  When provided, OpenRouter env var
+                 is ignored and an Anthropic client is always returned.
 
     Returns:
-        A configured :class:`anthropic.Anthropic` instance.
+        A configured client instance compatible with :func:`call_engine`.
     """
     if api_key is not None:
         return anthropic.Anthropic(api_key=api_key)
+    or_key = os.environ.get("OPENROUTER_API_KEY")
+    if or_key:
+        return _OpenRouterClient(or_key)
     return anthropic.Anthropic()

@@ -16,6 +16,7 @@ import anthropic
 
 from aurpg.llm import (
     EngineResponse,
+    _OpenRouterClient,
     assemble_prompt,
     call_engine,
     call_engine_with_retry,
@@ -422,9 +423,23 @@ def test_make_client_uses_provided_api_key():
 
 
 def test_make_client_uses_env_var_when_no_key(monkeypatch):
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-from-env")
     client = make_client()
     assert client.api_key == "sk-from-env"
+
+
+def test_make_client_returns_openrouter_client_when_env_set(monkeypatch):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-test-key")
+    client = make_client()
+    assert isinstance(client, _OpenRouterClient)
+
+
+def test_make_client_explicit_api_key_overrides_openrouter_env(monkeypatch):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-test-key")
+    client = make_client(api_key="sk-explicit-key")
+    assert isinstance(client, anthropic.Anthropic)
+    assert client.api_key == "sk-explicit-key"
 
 
 # ---------------------------------------------------------------------------
