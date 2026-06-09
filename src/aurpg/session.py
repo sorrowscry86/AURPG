@@ -24,6 +24,7 @@ from __future__ import annotations
 import json
 import uuid
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 
 from aurpg.llm import EngineResponse, assemble_prompt, call_engine_with_retry
@@ -259,6 +260,7 @@ def save_session(session: Session, save_dir: Path) -> Path:
         "max_tokens": session.max_tokens,
         "recap_threshold": session.recap_threshold,
         "system_prompt_path": session.system_prompt_path,
+        "last_saved": datetime.now(timezone.utc).isoformat(),
     }
     (session_dir / "meta.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
 

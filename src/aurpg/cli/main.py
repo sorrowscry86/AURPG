@@ -149,7 +149,10 @@ def cmd_list(args) -> None:
         if meta_path.exists():
             try:
                 meta = json.loads(meta_path.read_text(encoding="utf-8"))
-                print(f"{session_id}  (model: {meta['model']})")
+                saved = meta.get("last_saved", "")
+                # Trim to date+time without microseconds or timezone suffix
+                saved_display = saved[:16].replace("T", " ") if saved else "unknown"
+                print(f"{session_id}  saved: {saved_display}  model: {meta['model']}")
             except Exception:
                 print(session_id)
         else:
