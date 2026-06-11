@@ -1,7 +1,12 @@
 """Parse AURPG campaign-state XML into SessionState dataclasses and back.
 
-Round-trip guarantee: ``dump_state(parse_state(xml)) == parse_state(dump_state(parse_state(xml)))``
-All validation is delegated to ``aurpg.validator``; the parser trusts well-formed, valid input.
+Round-trip guarantee: ``parse_state(dump_state(state))`` produces a SessionState
+with field values identical to the original ``state`` for all containers.
+
+The parser performs its own structural and type validation (required elements,
+required attributes, enum membership, strict boolean literals). Use it alongside
+``aurpg.validator``, which provides schema-level checks on raw XML files before
+parsing. Both raise ``ValueError`` on invalid input.
 """
 
 from __future__ import annotations
@@ -47,13 +52,19 @@ from aurpg.state import (
 
 def load_state(path: Path) -> SessionState:
     """Load and parse a campaign-state XML file."""
-    tree = ET.parse(path)
+    try:
+        tree = ET.parse(path)
+    except ET.ParseError as exc:
+        raise ValueError(f"Malformed XML in {path}: {exc}") from exc
     return _parse_root(tree.getroot())
 
 
 def parse_state(xml_string: str) -> SessionState:
     """Parse a campaign-state XML string."""
-    root = ET.fromstring(xml_string)
+    try:
+        root = ET.fromstring(xml_string)
+    except ET.ParseError as exc:
+        raise ValueError(f"Malformed XML string: {exc}") from exc
     return _parse_root(root)
 
 
@@ -159,7 +170,9 @@ def _bool_attr(elem: Element, name: str) -> bool:
         return True
     if val == "false":
         return False
-    raise ValueError(f"<{elem.tag}> attribute '{name}' must be 'true' or 'false', got '{val}'")
+    raise ValueError(
+        f"<{elem.tag}> attribute '{name}' must be 'true' or 'false', got '{val}'"
+    )
 
 
 def _parse_root(root: Element) -> SessionState:

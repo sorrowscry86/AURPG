@@ -147,6 +147,11 @@ def test_parse_state_minimal_valid():
     assert state.resolution_state.effect == Effect.GREAT
 
 
+def test_parse_state_malformed_xml_raises_value_error():
+    with pytest.raises(ValueError, match="[Mm]alformed"):
+        parse_state("<unclosed>")
+
+
 def test_parse_state_missing_session_state_raises():
     with pytest.raises(ValueError, match="session_state"):
         parse_state("<aurpg_campaign_state/>")
@@ -236,6 +241,10 @@ def test_round_trip_inventory_tags():
     original = load_state(SAMPLE_STATE)
     xml_out = dump_state(original)
     restored = parse_state(xml_out)
-    orig_item = next(i for i in original.resources.inventory if i.name == "signal_scrambler")
-    rest_item = next(i for i in restored.resources.inventory if i.name == "signal_scrambler")
+    orig_item = next(
+        i for i in original.resources.inventory if i.name == "signal_scrambler"
+    )
+    rest_item = next(
+        i for i in restored.resources.inventory if i.name == "signal_scrambler"
+    )
     assert set(rest_item.tags) == set(orig_item.tags)
