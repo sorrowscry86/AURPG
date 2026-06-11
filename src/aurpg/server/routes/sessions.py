@@ -63,7 +63,7 @@ def _get_or_load(session_id: str):
 
 
 @router.get("/sessions", response_model=list[SessionSummary])
-async def list_sessions() -> list[SessionSummary]:
+def list_sessions() -> list[SessionSummary]:
     saves = _saves_dir()
     saves.mkdir(parents=True, exist_ok=True)
 
@@ -106,7 +106,7 @@ async def list_sessions() -> list[SessionSummary]:
                     ps_elem = tree.getroot().find("session_state/player_state")
                     if ps_elem is not None:
                         character_name = ps_elem.get("character_name")
-                except ET.ParseError:
+                except (ET.ParseError, OSError):
                     pass
 
         results.append(
@@ -122,7 +122,7 @@ async def list_sessions() -> list[SessionSummary]:
 
 
 @router.post("/sessions", response_model=SessionCreateResponse, status_code=201)
-async def create_session(body: WizardConfigBody) -> SessionCreateResponse:
+def create_session(body: WizardConfigBody) -> SessionCreateResponse:
     config = WizardConfig(
         title=body.title,
         genre=body.genre,
@@ -168,7 +168,7 @@ async def create_session(body: WizardConfigBody) -> SessionCreateResponse:
 
 
 @router.get("/sessions/{session_id}/state", response_model=SessionStateResponse)
-async def get_session_state(session_id: str) -> SessionStateResponse:
+def get_session_state(session_id: str) -> SessionStateResponse:
     _require_uuid(session_id)
     session = _get_or_load(session_id)
 
@@ -192,7 +192,7 @@ async def get_session_state(session_id: str) -> SessionStateResponse:
 
 
 @router.delete("/sessions/{session_id}")
-async def delete_session(session_id: str) -> dict:
+def delete_session(session_id: str) -> dict:
     _require_uuid(session_id)
     session_dir = _saves_dir() / session_id
     if session_dir.exists():

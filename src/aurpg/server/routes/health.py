@@ -12,7 +12,7 @@ router = APIRouter()
 
 
 @router.get("/health", response_model=HealthResponse)
-async def get_health() -> HealthResponse:
+def get_health() -> HealthResponse:
     try:
         version = importlib.metadata.version("aurpg")
     except importlib.metadata.PackageNotFoundError:

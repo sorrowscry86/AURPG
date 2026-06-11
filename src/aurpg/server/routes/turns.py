@@ -5,7 +5,6 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-import anyio
 from fastapi import APIRouter, HTTPException
 
 from aurpg.safety import detect_safety_command
@@ -42,13 +41,9 @@ def _get_or_load(session_id: str):
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-def _run_turn_sync(session, player_input: str, client):
-    """Wrapper so the blocking call runs in a thread via anyio."""
-    return run_turn(session, player_input, client=client)
-
-
+# Plain def — FastAPI runs this in a threadpool, keeping the LLM call off the event loop.
 @router.post("/sessions/{session_id}/turn", response_model=TurnResponse)
-async def post_turn(session_id: str, body: TurnRequest) -> TurnResponse:
+def post_turn(session_id: str, body: TurnRequest) -> TurnResponse:
     if not _UUID_RE.match(session_id):
         raise HTTPException(status_code=400, detail="Invalid session_id format")
 
@@ -59,9 +54,7 @@ async def post_turn(session_id: str, body: TurnRequest) -> TurnResponse:
     safety_cmd = detect_safety_command(body.player_input)
 
     try:
-        new_sess, response = await anyio.to_thread.run_sync(
-            lambda: _run_turn_sync(session, body.player_input, client)
-        )
+        new_sess, response = run_turn(session, body.player_input, client=client)
     except Exception as exc:
         raise HTTPException(
             status_code=502,

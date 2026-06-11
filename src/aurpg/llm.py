@@ -358,8 +358,17 @@ def make_client(
     Returns:
         A configured client instance compatible with :func:`call_engine`.
     """
-    if provider == "openrouter" and api_key:
-        return _OpenRouterClient(api_key)
+    if provider == "openrouter":
+        key = api_key or os.environ.get("OPENROUTER_API_KEY")
+        if not key:
+            raise ValueError(
+                "OpenRouter API key is required when provider='openrouter'; "
+                "pass api_key= or set OPENROUTER_API_KEY"
+            )
+        return _OpenRouterClient(key)
+    if provider == "anthropic":
+        return anthropic.Anthropic(api_key=api_key)
+    # Auto-detect from environment when provider is not specified
     if api_key is not None:
         return anthropic.Anthropic(api_key=api_key)
     or_key = os.environ.get("OPENROUTER_API_KEY")

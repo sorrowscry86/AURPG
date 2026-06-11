@@ -32,7 +32,7 @@ def _mask_key(key: str) -> str:
 
 
 @router.get("/settings", response_model=SettingsResponse)
-async def get_settings() -> SettingsResponse:
+def get_settings() -> SettingsResponse:
     s = get_app_settings()
     return SettingsResponse(
         provider=s.provider,
@@ -45,7 +45,7 @@ async def get_settings() -> SettingsResponse:
 
 
 @router.put("/settings", response_model=SettingsResponse)
-async def put_settings(body: SettingsUpdate) -> SettingsResponse:
+def put_settings(body: SettingsUpdate) -> SettingsResponse:
     kwargs = body.model_dump(exclude_none=True)
     if not kwargs:
         raise HTTPException(status_code=400, detail="No fields to update")
