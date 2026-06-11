@@ -20,7 +20,7 @@ jobs:
           cache: pip
 
       - name: Install package with dev dependencies
-        run: pip install -e ".[dev]"
+        run: pip install -e ".[dev,server]"
 
       - name: Run non-live tests
         # -m "not live" skips all tests that call the real Anthropic API.
