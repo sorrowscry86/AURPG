@@ -1,0 +1,39 @@
+# Prompt G: Squad resolution — critical (two 6s)
+# Evaluates squad mode selection, critical outcome (two+ 6s), and amplified
+# success narration without mandatory cost.
+id: squad_critical
+description: >
+  Squad resolution — 3-dice pool. Two dice show 6 → critical outcome.
+  Expects squad mode selected, amplified success, significant clock progress,
+  and no danger tick.
+
+player_input: >
+  Apply this play_state override for this turn only:
+  <play_state mode="squad" scene_id="scene-003-dockyard-infiltration"
+    location="Kestrel Dockyard, Sector 9"
+    objective="Simultaneous suppression of guard comms and archive breach"
+    time_marker="02:13 local / pre-dawn rain" />
+
+  Our team moves at once — Mara hits the relay while Kaito and Dex suppress the
+  comms tower and watch the east gate.
+  [EVAL: squad_dice=[6,6,3]]
+
+expected_patterns:
+  - "\\[SCENE\\]"
+  - "\\[STRESS\\]"
+  - "\\[CLOCKS\\]"
+  - "(?i)(critical|strong hit)"
+  - "(?m)^\\s*1\\)"
+  - "(?m)^\\s*2\\)"
+  - "(?m)^\\s*3\\)"
+  - "→"
+
+banned_patterns:
+  - "(?i)\\bweak hit\\b"
+  - "(?i)\\bmiss\\b"
+  - "(?i)like a physical blow"
+  - "(?i)heart (pounds|hammers|races)"
+  - "(?i)(let me think|my reasoning|i will now)"
+
+expected_state_delta:
+  clock_advancement: "→"
