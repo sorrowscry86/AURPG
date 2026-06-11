@@ -1,38 +1,37 @@
-# Solo resolution — strong hit
-# Controlled position, great effect: the action succeeds cleanly with amplified impact.
+# Prompt D: Solo strong hit — clean success, no cost
+# Evaluates that a strong hit produces success without mandatory cost and
+# may improve position or grant a secondary benefit.
 id: solo_strong_hit
 description: >
-  Solo resolution — controlled position, great effect. Strong hit should
-  yield full success, no cost, and preferably improved momentum or position.
+  Solo resolution — risky position, standard effect. Strong hit should yield
+  clean success with no danger tick, and may improve position or grant a bonus.
 
 player_input: >
-  I use the security backdoor that's already open to slip past the vault perimeter
-  and plant the extraction tap on the archive node — clean and quiet.
+  I move behind the guard station and watch his rhythm until I find the gap,
+  then lift the override fob from his coat pocket.
+  [EVAL: action_die=4, challenge=[2,4]]
 
 expected_patterns:
-  # Ledger update present
   - "\\[SCENE\\]"
+  - "\\[STRESS\\]"
   - "\\[CLOCKS\\]"
-  # Strong hit declared
   - "(?i)strong hit"
-  # No cost imposed on a strong hit
-  - "(?i)(momentum|position improved|clean|no complication|no cost)"
-  # Exactly three numbered options
   - "(?m)^\\s*1\\)"
   - "(?m)^\\s*2\\)"
   - "(?m)^\\s*3\\)"
-  # Freeform invite
-  - "(?i)(or tell me|or what|or describe)"
+  - "(?i)(or tell me|or what|or describe|freeform)"
+  # Mission clock should advance on a successful action
+  - "→"
 
 banned_patterns:
-  # Strong hits must not impose costs
-  - "(?i)(you pay|you suffer|you lose|complication|danger advances|alarm)"
+  - "(?i)\\bweak hit\\b"
+  - "(?i)\\bmiss\\b"
   - "(?i)like a physical blow"
   - "(?i)shivers? down (my|her|his) spine"
   - "(?i)heart (pounds|hammers|races)"
-  - "(?i)breath catches"
   - "(?i)(let me think|my reasoning|i will now)"
+  # On a strong hit the danger clock should NOT tick
+  - "(?i)alarm.sweep.*→.*[4-9]"
 
 expected_state_delta:
-  # Mission clock should have advanced
   clock_advancement: "→"
