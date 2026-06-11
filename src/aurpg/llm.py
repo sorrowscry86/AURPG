@@ -332,24 +332,34 @@ def call_engine_with_retry(
 # ---------------------------------------------------------------------------
 
 
-def make_client(api_key: str | None = None) -> anthropic.Anthropic | _OpenRouterClient:
+def make_client(
+    api_key: str | None = None,
+    *,
+    provider: str | None = None,
+) -> anthropic.Anthropic | _OpenRouterClient:
     """Create and return an API client.
 
     Priority order:
-    1. If *api_key* is provided, always return an :class:`anthropic.Anthropic` client
-       using that key.
-    2. If ``OPENROUTER_API_KEY`` is set in the environment, return an
+    1. If *provider* is ``"openrouter"`` and *api_key* is given, return an
+       :class:`_OpenRouterClient` with that key.
+    2. If *api_key* is provided without a provider, return an
+       :class:`anthropic.Anthropic` client using that key.
+    3. If ``OPENROUTER_API_KEY`` is set in the environment, return an
        :class:`_OpenRouterClient` (requires ``openai`` package installed).
-    3. Otherwise return an :class:`anthropic.Anthropic` client that reads
+    4. Otherwise return an :class:`anthropic.Anthropic` client that reads
        ``ANTHROPIC_API_KEY`` from the environment automatically.
 
     Args:
-        api_key: Explicit Anthropic API key.  When provided, OpenRouter env var
-                 is ignored and an Anthropic client is always returned.
+        api_key:  Explicit API key.  For ``provider="openrouter"`` this is the
+                  OpenRouter key; otherwise an Anthropic key.
+        provider: ``"openrouter"`` or ``"anthropic"``.  When ``None``,
+                  auto-detects from environment variables.
 
     Returns:
         A configured client instance compatible with :func:`call_engine`.
     """
+    if provider == "openrouter" and api_key:
+        return _OpenRouterClient(api_key)
     if api_key is not None:
         return anthropic.Anthropic(api_key=api_key)
     or_key = os.environ.get("OPENROUTER_API_KEY")
