@@ -14,6 +14,7 @@ from xml.etree import ElementTree as ET
 from xml.etree.ElementTree import Element, SubElement
 
 from aurpg.safety import SafetyCommand, apply_safety_command
+from aurpg.state.ledger_parser import LedgerMutations
 from aurpg.validator import validate
 
 
@@ -400,6 +401,76 @@ def state_to_xml(state: CampaignState) -> str:
     root.append(_build_safety_profile_elem(state.safety_profile))
     ET.indent(root, space="  ")
     return ET.tostring(root, encoding="unicode")
+
+
+def clear_safety_flags(state: CampaignState) -> CampaignState:
+    """Reset all safety flags so normal play can resume after a safety event.
+
+    Sets ``hard_stop``, ``pause`` to ``"false"`` and ``intensity_check`` to
+    ``"none"``.  All other safety_state fields are preserved.
+
+    Args:
+        state: Current campaign state (not modified).
+
+    Returns:
+        A new :class:`CampaignState` with safety flags cleared.
+    """
+    new_state = _copy_state(state)
+    safety = new_state.session_state.setdefault("safety_state", {})
+    safety["hard_stop"] = "false"
+    safety["pause"] = "false"
+    safety["intensity_check"] = "none"
+    return new_state
+
+
+def apply_ledger_mutations(state: CampaignState, mutations: LedgerMutations) -> CampaignState:
+    """Apply a parsed ledger mutations dict to state.
+
+    Only keys present in *mutations* are updated; absent keys leave the
+    corresponding state fields unchanged.  All numeric values are clamped to
+    their valid ranges (stress 0–10, momentum −6–10).
+
+    Clock matching is case-insensitive against each clock's ``label`` attribute.
+    Clocks not mentioned in *mutations* are not modified.
+
+    Args:
+        state:     Current campaign state (not modified).
+        mutations: Dict produced by :func:`~aurpg.state.ledger_parser.parse_ledger`.
+
+    Returns:
+        A new :class:`CampaignState` reflecting all mutations.
+    """
+    if not mutations:
+        return state
+
+    new_state = _copy_state(state)
+
+    ps = new_state.session_state.setdefault("player_state", {})
+    if "stress" in mutations:
+        ps["stress"] = str(max(0, min(10, mutations["stress"])))
+    if "momentum" in mutations:
+        ps["momentum"] = str(max(-6, min(10, mutations["momentum"])))
+    if "harm" in mutations:
+        ps["harm"] = mutations["harm"]
+
+    play = new_state.session_state.setdefault("play_state", {})
+    if "scene_id" in mutations:
+        play["scene_id"] = mutations["scene_id"]
+    if "time_marker" in mutations:
+        play["time_marker"] = mutations["time_marker"]
+    if "objective" in mutations:
+        play["objective"] = mutations["objective"]
+
+    if "clocks" in mutations:
+        for clock_mut in mutations["clocks"]:
+            label_lower = clock_mut["label"].lower()
+            for clock in new_state.clocks:
+                if clock.get("label", "").lower() == label_lower:
+                    segments = int(clock.get("segments", clock_mut["segments"]))
+                    clock["filled"] = str(max(0, min(segments, clock_mut["filled"])))
+                    break
+
+    return new_state
 
 
 def save_state(state: CampaignState, path: Path | None = None) -> Path:

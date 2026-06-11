@@ -29,11 +29,14 @@ from pathlib import Path
 
 from aurpg.llm import EngineResponse, assemble_prompt, call_engine_with_retry
 from aurpg.safety import SafetyCommand, build_ooc_response, detect_safety_command
+from aurpg.state.ledger_parser import parse_ledger
 from aurpg.state.manager import (
     CampaignState,
     StateError,
     append_turn,
+    apply_ledger_mutations,
     apply_safety,
+    clear_safety_flags,
     load_state,
     save_state,
     state_to_xml,
@@ -193,8 +196,14 @@ def run_turn(
         )
         return new_session, synthetic_response
 
+    # --- Auto-clear safety flags so resumption after a safety event is clean --
+    working_state = session.state
+    safety_flags = working_state.session_state.get("safety_state", {})
+    if safety_flags.get("pause") == "true" or safety_flags.get("hard_stop") == "true":
+        working_state = clear_safety_flags(working_state)
+
     # --- Normal LLM turn ----------------------------------------------------
-    campaign_state_xml = state_to_xml(session.state)
+    campaign_state_xml = state_to_xml(working_state)
 
     messages = assemble_prompt(campaign_state_xml, player_input)
     engine_response = call_engine_with_retry(
@@ -205,6 +214,10 @@ def run_turn(
         max_tokens=session.max_tokens,
     )
 
+    # Apply any state changes described in the ledger (stress, momentum, clocks, etc.)
+    mutations = parse_ledger(engine_response.ledger_block)
+    new_state = apply_ledger_mutations(working_state, mutations)
+
     turn_record: dict = {
         "player_input": player_input,
         "raw_response": engine_response.raw_text,
@@ -213,7 +226,7 @@ def run_turn(
         "input_tokens": engine_response.input_tokens,
         "output_tokens": engine_response.output_tokens,
     }
-    new_state = append_turn(session.state, turn_record)
+    new_state = append_turn(new_state, turn_record)
     new_session = Session(
         id=session.id,
         state=new_state,
