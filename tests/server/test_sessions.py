@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import copy
-
 import pytest
 
 from tests.server.conftest import _MINIMAL_BODY
@@ -177,7 +175,7 @@ async def test_list_sessions_multiple(client):
     await client.post("/sessions", json=_MINIMAL_BODY)
     await client.post("/sessions", json=_MINIMAL_BODY)
     data = (await client.get("/sessions")).json()
-    assert len(data) >= 2
+    assert len(data) == 2
 
 
 # ---------------------------------------------------------------------------

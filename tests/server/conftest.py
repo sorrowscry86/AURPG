@@ -2,18 +2,13 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from unittest.mock import MagicMock
 
 import httpx
 import pytest
 
-from aurpg.llm import EngineResponse
 from aurpg.server.app import app
 from aurpg.server._settings import AppSettings
-
-_REPO_ROOT = Path(__file__).parent.parent.parent
-_SYSTEM_PROMPT_PATH = _REPO_ROOT / "src" / "aurpg" / "prompts" / "aurpg_system_prompt_prototype.xml"
 
 _MINIMAL_BODY: dict = {
     "title": "Iron Wastes",
@@ -37,15 +32,6 @@ _MINIMAL_BODY: dict = {
     "initial_position": "risky",
     "initial_effect": "standard",
 }
-
-_FAKE_RESPONSE = EngineResponse(
-    raw_text="The shadows part. 1) Press forward. 2) Fall back. 3) Call for help.",
-    ledger_block="[SCENE] Dockyard shadows\n[STRESS] +1",
-    options=["Press forward.", "Fall back.", "Call for help."],
-    input_tokens=100,
-    output_tokens=50,
-)
-
 
 @pytest.fixture(autouse=True)
 def _reset_store():

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from unittest.mock import patch
-
 import pytest
 
 from aurpg.llm import EngineResponse
@@ -26,7 +24,7 @@ _XCARD_RESPONSE = EngineResponse(
 
 
 def _make_run_turn(response: EngineResponse):
-    """Return a mock run_turn that injects a fake client into the store and returns response."""
+    """Return a mock run_turn function that returns the given response."""
 
     def _run_turn(session, player_input, *, client):
         from aurpg.session import Session
@@ -146,7 +144,7 @@ async def test_turn_ledger_block_string(client, session_id, fake_client, monkeyp
             f"/sessions/{session_id}/turn", json={"player_input": "Look around."}
         )
     ).json()
-    assert data["ledger_block"] is None or isinstance(data["ledger_block"], str)
+    assert data["ledger_block"] == "[SCENE] Dockyard\n[STRESS] +0"
 
 
 @pytest.mark.asyncio
@@ -264,3 +262,4 @@ async def test_turn_engine_error_returns_502(client, session_id, fake_client, mo
         f"/sessions/{session_id}/turn", json={"player_input": "Hello."}
     )
     assert resp.status_code == 502
+    assert resp.json()["detail"] == {"error": "engine_timeout", "message": "LLM timeout"}
