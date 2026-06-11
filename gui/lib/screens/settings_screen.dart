@@ -16,6 +16,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final _apiKeyCtrl = TextEditingController();
   final _savesDirCtrl = TextEditingController();
   final _portCtrl = TextEditingController();
+  final _modelCtrl = TextEditingController();
 
   bool _obscureKey = true;
   bool _dirty = false;
@@ -31,16 +32,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _apiKeyCtrl.dispose();
     _savesDirCtrl.dispose();
     _portCtrl.dispose();
+    _modelCtrl.dispose();
     super.dispose();
-  }
-
-  void _hydrate(AppSettings s) {
-    if (_hydrated) return;
-    _hydrated = true;
-    _provider = s.provider;
-    _model = s.model;
-    _savesDirCtrl.text = s.savesDir;
-    _portCtrl.text = s.port.toString();
   }
 
   void _markDirty() => setState(() => _dirty = true);
@@ -66,11 +59,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final key = _apiKeyCtrl.text.trim();
     final port = int.tryParse(_portCtrl.text.trim());
     final saves = _savesDirCtrl.text.trim();
+    final model = _models.isEmpty ? _modelCtrl.text.trim() : _model;
     try {
       await ref.read(settingsProvider.notifier).save(
             provider: _provider,
             apiKey: key.isNotEmpty ? key : null,
-            model: _model,
+            model: model,
             savesDir: saves.isNotEmpty ? saves : null,
             port: port,
           );
@@ -93,6 +87,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Widget build(BuildContext context) {
     final settingsAsync = ref.watch(settingsProvider);
 
+    // Hydrate controllers once when settings first load; safe in ref.listen.
+    ref.listen<AsyncValue<AppSettings>>(settingsProvider, (_, next) {
+      next.whenData((settings) {
+        if (!_hydrated) {
+          _hydrated = true;
+          _provider = settings.provider;
+          _model = settings.model;
+          _modelCtrl.text = settings.model;
+          _savesDirCtrl.text = settings.savesDir;
+          _portCtrl.text = settings.port.toString();
+          setState(() {});
+        }
+      });
+    });
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Settings'),
@@ -110,10 +119,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       body: settingsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Error: $e')),
-        data: (settings) {
-          _hydrate(settings);
-          return _buildForm(settings);
-        },
+        data: (settings) => _buildForm(settings),
       ),
     );
   }
@@ -168,15 +174,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   child: _models.isEmpty
                       ? TextFormField(
                           key: const ValueKey('model_text'),
-                          initialValue: settings.model,
+                          controller: _modelCtrl,
                           decoration: const InputDecoration(
                             labelText: 'Model ID',
                             hintText: 'e.g. claude-haiku-4-5-20251001',
                           ),
-                          onChanged: (v) => setState(() {
-                            _model = v;
-                            _dirty = true;
-                          }),
+                          onChanged: (_) => _markDirty(),
                         )
                       : DropdownButtonFormField<String>(
                           key: const ValueKey('model_dropdown'),

@@ -7,7 +7,7 @@ import 'package:aurpg_gui/main.dart';
 void main() {
   testWidgets('App renders without crashing', (WidgetTester tester) async {
     await tester.pumpWidget(const ProviderScope(child: AurpgApp()));
-    expect(find.byType(MaterialApp), findsNothing); // uses MaterialApp.router
+    expect(find.byType(MaterialApp), findsOneWidget);
     expect(find.byType(Router), findsOneWidget);
   });
 }

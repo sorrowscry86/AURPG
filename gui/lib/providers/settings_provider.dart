@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../api/client.dart';
@@ -6,10 +7,21 @@ import '../api/models.dart';
 import 'server_provider.dart';
 
 class SettingsNotifier extends AsyncNotifier<AppSettings> {
-  SettingsApi _api(String baseUrl) => SettingsApi(createDioClient(baseUrl));
+  Dio? _dioClient;
+
+  /// Returns a cached SettingsApi, recreating the Dio client only when the
+  /// base URL changes (e.g. user changes the port in settings).
+  SettingsApi _api(String baseUrl) {
+    if (_dioClient == null || _dioClient!.options.baseUrl != baseUrl) {
+      _dioClient?.close();
+      _dioClient = createDioClient(baseUrl);
+    }
+    return SettingsApi(_dioClient!);
+  }
 
   @override
   Future<AppSettings> build() async {
+    ref.onDispose(() => _dioClient?.close());
     final server = await ref.watch(serverProvider.future);
     if (server.status != ServerStatus.ready) {
       throw StateError('Server not ready');
